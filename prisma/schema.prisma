@@ -1,0 +1,106 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户角色枚举
+enum UserRole {
+  OWNER      // 车位业主
+  TENANT     // 车位租户
+  ADMIN      // 管理员
+}
+
+// 用户模型
+model User {
+  id            String    @id @default(cuid())
+  phone         String    @unique
+  wxOpenid      String?   @unique @map("wx_openid")
+  role          UserRole  @default(TENANT)
+  name          String?
+  avatar        String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // 关系
+  ownedSpots    ParkingSpot[] @relation("OwnerSpots")
+  orders        Order[]       @relation("TenantOrders")
+
+  @@map("users")
+}
+
+// 车位状态枚举
+enum SpotStatus {
+  AVAILABLE    // 可租
+  RENTED       // 已租
+  UNAVAILABLE  // 暂不出租
+}
+
+// 车位模型
+model ParkingSpot {
+  id            String      @id @default(cuid())
+  ownerId       String      @map("owner_id")
+  title         String
+  address       String
+  longitude     Float
+  latitude      Float
+  pricePerHour  Decimal     @map("price_per_hour") @db.Decimal(10, 2)
+  description   String?
+  images        String[]    @default([])
+  status        SpotStatus  @default(AVAILABLE)
+  availableFrom DateTime?   @map("available_from")  // 每日可租开始时间
+  availableTo   DateTime?   @map("available_to")    // 每日可租结束时间
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  // 关系
+  owner         User        @relation("OwnerSpots", fields: [ownerId], references: [id])
+  orders        Order[]
+
+  @@index([longitude, latitude])
+  @@index([status])
+  @@map("parking_spots")
+}
+
+// 订单状态枚举
+enum OrderStatus {
+  PENDING      // 待确认
+  CONFIRMED    // 已确认
+  IN_PROGRESS  // 进行中
+  COMPLETED    // 已完成
+  CANCELLED    // 已取消
+  REJECTED     // 已拒绝
+}
+
+// 订单模型
+model Order {
+  id            String      @id @default(cuid())
+  spotId        String      @map("spot_id")
+  tenantId      String      @map("tenant_id")
+  startTime     DateTime    @map("start_time")
+  endTime       DateTime    @map("end_time")
+  totalPrice    Decimal     @map("total_price") @db.Decimal(10, 2)
+  status        OrderStatus @default(PENDING)
+  note          String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  // 关系
+  spot          ParkingSpot @relation(fields: [spotId], references: [id])
+  tenant        User        @relation("TenantOrders", fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([spotId])
+  @@index([status])
+  @@map("orders")
+}
