@@ -4,33 +4,38 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ParkingSpot, SpotStatus } from "@/types";
 
-export default function MySpotsPage() {
+export default function OwnerSpotsPage() {
   const [spots, setSpots] = useState<ParkingSpot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<SpotStatus | "ALL">("ALL");
 
   useEffect(() => {
     fetchSpots();
-  }, []);
+  }, [filter]);
 
   const fetchSpots = async () => {
     try {
-      const res = await fetch("/api/parking-spots/my");
+      let url = "/api/parking-spots";
+      if (filter !== "ALL") {
+        url += `?status=${filter}`;
+      }
+
+      const res = await fetch(url);
       const data = await res.json();
+
       if (data.success) {
         setSpots(data.data);
       }
     } catch (err) {
-      console.error("获取车位列表失败:", err);
+      console.error("获取车位失败:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleStatus = async (id: string, currentStatus: SpotStatus) => {
-    const newStatus =
-      currentStatus === "AVAILABLE" ? "UNAVAILABLE" : "AVAILABLE";
+  const handleStatusChange = async (spotId: string, newStatus: SpotStatus) => {
     try {
-      const res = await fetch(`/api/parking-spots/${id}`, {
+      const res = await fetch(`/api/parking-spots/${spotId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -44,11 +49,11 @@ export default function MySpotsPage() {
     }
   };
 
-  const deleteSpot = async (id: string) => {
+  const handleDelete = async (spotId: string) => {
     if (!confirm("确定要删除这个车位吗？")) return;
 
     try {
-      const res = await fetch(`/api/parking-spots/${id}`, {
+      const res = await fetch(`/api/parking-spots/${spotId}`, {
         method: "DELETE",
       });
 
@@ -90,81 +95,108 @@ export default function MySpotsPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold">我的车位</h1>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="text-gray-600 hover:text-gray-900">
+              ← 返回
+            </Link>
+            <h1 className="text-xl font-bold">我的车位</h1>
+          </div>
           <Link
             href="/owner/publish"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
           >
-            + 发布车位
+            + 发布新车位
           </Link>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {spots.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">🚗</div>
-            <h3 className="text-lg font-medium text-gray-900">还没有车位</h3>
-            <p className="text-gray-500 mt-2">发布您的第一个车位开始赚钱吧</p>
-            <Link
-              href="/owner/publish"
-              className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        {/* 筛选器 */}
+        <div className="flex gap-2 mb-6">
+          {[
+            { key: "ALL", label: "全部" },
+            { key: "AVAILABLE", label: "可租" },
+            { key: "RENTED", label: "已租" },
+            { key: "UNAVAILABLE", label: "暂不出租" },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key as SpotStatus | "ALL")}
+              className={`px-4 py-2 rounded-lg text-sm ${
+                filter === key
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-100"
+              }`}
             >
-              发布车位
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {spots.map((spot) => (
-              <div
-                key={spot.id}
-                className="bg-white rounded-xl shadow p-6"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-lg">{spot.title}</h3>
-                      {getStatusBadge(spot.status)}
-                    </div>
-                    <p className="text-gray-500 text-sm mt-1">
-                      {spot.address}
-                    </p>
-                    <div className="flex items-center gap-4 mt-3">
-                      <span className="text-blue-600 font-bold">
-                        ¥{spot.pricePerHour}/小时
-                      </span>
-                      <span className="text-gray-400 text-sm">
-                        发布于{" "}
-                        {new Date(spot.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+              {label}
+            </button>
+          ))}
+        </div>
 
-                <div className="flex gap-2 mt-4">
-                  <Link
-                    href={`/parking-spots/${spot.id}`}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    查看
-                  </Link>
-                  <button
-                    onClick={() => toggleStatus(spot.id, spot.status)}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    {spot.status === "AVAILABLE" ? "下架" : "上架"}
-                  </button>
-                  <button
-                    onClick={() => deleteSpot(spot.id)}
-                    className="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
-                  >
-                    删除
-                  </button>
+        {/* 车位列表 */}
+        <div className="space-y-4">
+          {spots.map((spot) => (
+            <div
+              key={spot.id}
+              className="bg-white rounded-xl shadow p-6"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-lg">{spot.title}</h3>
+                    {getStatusBadge(spot.status)}
+                  </div>
+                  <p className="text-gray-500 text-sm mt-1">{spot.address}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xl font-bold text-blue-600">
+                    ¥{spot.pricePerHour}
+                  </div>
+                  <div className="text-xs text-gray-400">/小时</div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="flex gap-2">
+                {spot.status === SpotStatus.AVAILABLE && (
+                  <button
+                    onClick={() => handleStatusChange(spot.id, SpotStatus.UNAVAILABLE)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    下架
+                  </button>
+                )}
+                {spot.status === SpotStatus.UNAVAILABLE && (
+                  <button
+                    onClick={() => handleStatusChange(spot.id, SpotStatus.AVAILABLE)}
+                    className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    上架
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDelete(spot.id)}
+                  className="px-3 py-1.5 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50"
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {spots.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-4xl mb-4">🚗</div>
+              <h3 className="text-lg font-medium text-gray-900">暂无车位</h3>
+              <p className="text-gray-500 mt-2">发布您的第一个车位吧</p>
+              <Link
+                href="/owner/publish"
+                className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                发布车位
+              </Link>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

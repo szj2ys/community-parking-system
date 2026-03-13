@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ParkingSpot } from "@/types";
+import { ParkingSpot, SpotStatus } from "@/types";
 
-export default function SpotDetailPage() {
-  const params = useParams();
+export default function ParkingSpotDetailPage({ params }: { params: { id: string } }) {
   const [spot, setSpot] = useState<ParkingSpot | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     fetchSpot();
@@ -19,17 +17,35 @@ export default function SpotDetailPage() {
     try {
       const res = await fetch(`/api/parking-spots/${params.id}`);
       const data = await res.json();
-
       if (data.success) {
         setSpot(data.data);
-      } else {
-        setError(data.message || "车位不存在");
+        // Check if current user is the owner
+        // This is a simplified check - in real app you'd check from session
+        setIsOwner(false); // Default to false for tenant view
       }
     } catch (err) {
-      setError("加载失败");
+      console.error("获取车位详情失败:", err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getStatusBadge = (status: SpotStatus) => {
+    const styles = {
+      AVAILABLE: "bg-green-100 text-green-700",
+      RENTED: "bg-blue-100 text-blue-700",
+      UNAVAILABLE: "bg-gray-100 text-gray-700",
+    };
+    const labels = {
+      AVAILABLE: "可租",
+      RENTED: "已租",
+      UNAVAILABLE: "暂不出租",
+    };
+    return (
+      <span className={`px-3 py-1 rounded-full text-sm ${styles[status]}`}>
+        {labels[status]}
+      </span>
+    );
   };
 
   if (loading) {
@@ -40,13 +56,13 @@ export default function SpotDetailPage() {
     );
   }
 
-  if (error || !spot) {
+  if (!spot) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-500">{error || "车位不存在"}</p>
-          <Link href="/" className="mt-4 text-blue-600 hover:underline">
-            返回首页
+          <p className="text-gray-500">车位不存在</p>
+          <Link href="/tenant/list" className="text-blue-600 hover:underline mt-4 block">
+            返回列表
           </Link>
         </div>
       </div>
@@ -56,97 +72,82 @@ export default function SpotDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm">
-        <div className="max-w-3xl mx-auto px-4 py-4">
-          <Link href="/" className="text-gray-600 hover:text-gray-900">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
+          <Link href="/tenant/list" className="text-gray-600 hover:text-gray-900">
             ← 返回
           </Link>
+          <h1 className="text-xl font-bold">车位详情</h1>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-xl shadow">
-          {/* Images */}
-          {spot.images && spot.images.length > 0 ? (
-            <div className="aspect-video bg-gray-100 rounded-t-xl overflow-hidden">
-              <img
-                src={spot.images[0]}
-                alt={spot.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ) : (
-            <div className="aspect-video bg-gray-100 rounded-t-xl flex items-center justify-center">
-              <span className="text-4xl">🚗</span>
-            </div>
-          )}
-
-          <div className="p-6">
+          {/* Header */}
+          <div className="p-6 border-b">
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-2xl font-bold">{spot.title}</h1>
+                <h2 className="text-2xl font-bold text-gray-900">{spot.title}</h2>
                 <p className="text-gray-500 mt-1">{spot.address}</p>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="text-3xl font-bold text-blue-600">
                   ¥{spot.pricePerHour}
                 </div>
                 <div className="text-sm text-gray-400">/小时</div>
               </div>
             </div>
+            <div className="mt-4">
+              {getStatusBadge(spot.status)}
+            </div>
+          </div>
 
-            <div className="mt-6">
-              <h3 className="font-medium text-gray-900">车位描述</h3>
-              <p className="text-gray-600 mt-2">
+          {/* Info */}
+          <div className="p-6 space-y-4">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">车位描述</h3>
+              <p className="text-gray-600">
                 {spot.description || "暂无描述"}
               </p>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-4">
+            {spot.availableFrom && spot.availableTo && (
               <div>
-                <h3 className="font-medium text-gray-900">可租时段</h3>
-                <p className="text-gray-600 mt-1">
-                  {spot.availableFrom
-                    ? new Date(spot.availableFrom).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "08:00"}
-                  -
-                  {spot.availableTo
-                    ? new Date(spot.availableTo).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "20:00"}
+                <h3 className="font-semibold text-gray-900 mb-2">可租时段</h3>
+                <p className="text-gray-600">
+                  {new Date(spot.availableFrom).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} -
+                  {new Date(spot.availableTo).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
+            )}
+
+            {spot.owner && (
               <div>
-                <h3 className="font-medium text-gray-900">状态</h3>
-                <p className="text-gray-600 mt-1">
-                  {spot.status === "AVAILABLE" ? "可租" : "暂不可租"}
+                <h3 className="font-semibold text-gray-900 mb-2">业主信息</h3>
+                <p className="text-gray-600">
+                  {spot.owner.name || "匿名业主"}
                 </p>
               </div>
-            </div>
+            )}
+          </div>
 
-            <div className="mt-6">
-              <h3 className="font-medium text-gray-900">位置</h3>
-              <p className="text-gray-600 mt-1">
-                经度: {spot.longitude}, 纬度: {spot.latitude}
-              </p>
-            </div>
-
-            <div className="mt-8">
+          {/* Actions */}
+          <div className="p-6 border-t bg-gray-50">
+            {spot.status === "AVAILABLE" && !isOwner && (
               <Link
                 href={`/orders/confirm?spotId=${spot.id}`}
-                className={`w-full py-3 px-4 text-center rounded-lg font-medium ${
-                  spot.status === "AVAILABLE"
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
+                className="block w-full py-3 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 font-medium"
               >
-                {spot.status === "AVAILABLE" ? "立即预订" : "暂不可租"}
+                立即预订
               </Link>
-            </div>
+            )}
+            {spot.status !== "AVAILABLE" && (
+              <button
+                disabled
+                className="block w-full py-3 bg-gray-300 text-gray-500 text-center rounded-lg cursor-not-allowed"
+              >
+                {spot.status === "RENTED" ? "已被预订" : "暂不出租"}
+              </button>
+            )}
           </div>
         </div>
       </main>

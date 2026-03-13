@@ -3,19 +3,20 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
+import { SpotStatus } from "@prisma/client";
 
 const createSpotSchema = z.object({
-  title: z.string().min(2, "标题至少2个字符").max(100, "标题最多100个字符"),
-  address: z.string().min(5, "地址至少5个字符"),
+  title: z.string().min(1, "请输入车位标题"),
+  address: z.string().min(1, "请输入详细地址"),
   longitude: z.number().min(-180).max(180),
   latitude: z.number().min(-90).max(90),
-  pricePerHour: z.number().min(1, "价格至少1元").max(1000, "价格最多1000元"),
+  pricePerHour: z.number().min(0, "价格不能为负数"),
   description: z.string().optional(),
-  images: z.array(z.string()).max(5, "最多5张图片"),
-  availableFrom: z.string().optional(), // HH:mm 格式
-  availableTo: z.string().optional(), // HH:mm 格式
+  availableFrom: z.string().optional(),
+  availableTo: z.string().optional(),
 });
 
+// 创建车位
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if ((session.user as any).role !== "OWNER") {
+    if ((session.user as { role?: string }).role !== "OWNER") {
       return NextResponse.json(
         errorResponse("FORBIDDEN", "只有业主可以发布车位"),
         { status: 403 }
@@ -50,10 +51,19 @@ export async function POST(request: NextRequest) {
       latitude,
       pricePerHour,
       description,
-      images,
       availableFrom,
       availableTo,
     } = parsed.data;
+
+    // 解析时间
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const availableFromDate = availableFrom
+      ? new Date(today.getTime() + parseTime(availableFrom))
+      : null;
+    const availableToDate = availableTo
+      ? new Date(today.getTime() + parseTime(availableTo))
+      : null;
 
     const spot = await prisma.parkingSpot.create({
       data: {
@@ -64,21 +74,58 @@ export async function POST(request: NextRequest) {
         latitude,
         pricePerHour,
         description,
-        images,
-        availableFrom: availableFrom
-          ? new Date(`2000-01-01T${availableFrom}:00`)
-          : null,
-        availableTo: availableTo
-          ? new Date(`2000-01-01T${availableTo}:00`)
-          : null,
+        availableFrom: availableFromDate,
+        availableTo: availableToDate,
+        status: "AVAILABLE",
       },
     });
 
     return NextResponse.json(successResponse(spot, "车位发布成功"));
   } catch (error) {
-    console.error("发布车位失败:", error);
-    return NextResponse.json(errorResponse("CREATE_FAILED", "发布车位失败"), {
+    console.error("创建车位失败:", error);
+    return NextResponse.json(errorResponse("CREATE_FAILED", "发布失败"), {
       status: 500,
     });
   }
+}
+
+// 获取我的车位列表
+export async function GET(request: NextRequest) {
+  try {
+    const session = await auth();
+
+    if (!session?.user) {
+      return NextResponse.json(errorResponse("UNAUTHORIZED", "请先登录"), {
+        status: 401,
+      });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status");
+
+    const where: { ownerId: string; status?: SpotStatus } = {
+      ownerId: session.user.id!,
+    };
+
+    if (status) {
+      where.status = status as SpotStatus;
+    }
+
+    const spots = await prisma.parkingSpot.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json(successResponse(spots));
+  } catch (error) {
+    console.error("获取车位列表失败:", error);
+    return NextResponse.json(errorResponse("FETCH_FAILED", "获取失败"), {
+      status: 500,
+    });
+  }
+}
+
+function parseTime(timeStr: string): number {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  return (hours * 60 + minutes) * 60 * 1000;
 }
