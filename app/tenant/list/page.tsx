@@ -7,11 +7,34 @@ import { ParkingSpot, SpotStatus } from "@/types";
 export default function ListSearchPage() {
   const [spots, setSpots] = useState<(ParkingSpot & { distance?: number })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seedInitializing, setSeedInitializing] = useState(false);
   const [filters, setFilters] = useState({
     minPrice: "",
     maxPrice: "",
-    sortBy: "distance", // distance, price
+    sortBy: "distance",
   });
+
+  // 自动初始化种子数据
+  useEffect(() => {
+    const initSeedData = async () => {
+      try {
+        // 先检查状态
+        const checkRes = await fetch("/api/seed");
+        const checkData = await checkRes.json();
+
+        if (!checkData.data?.hasSeedData) {
+          setSeedInitializing(true);
+          // 需要初始化
+          await fetch("/api/seed", { method: "POST" });
+          setSeedInitializing(false);
+        }
+      } catch (err) {
+        console.error("种子数据检查失败:", err);
+      }
+    };
+
+    initSeedData();
+  }, []);
 
   useEffect(() => {
     fetchSpots();
@@ -19,7 +42,6 @@ export default function ListSearchPage() {
 
   const fetchSpots = async () => {
     try {
-      // 获取用户位置用于计算距离
       let url = "/api/parking-spots/search?radius=50";
 
       if (navigator.geolocation) {
@@ -35,7 +57,6 @@ export default function ListSearchPage() {
             setLoading(false);
           },
           async () => {
-            // 获取所有车位
             const res = await fetch(url);
             const data = await res.json();
             if (data.success) {
@@ -73,7 +94,6 @@ export default function ListSearchPage() {
       if (filters.sortBy === "price") {
         return a.pricePerHour - b.pricePerHour;
       }
-      // 默认按距离
       return (a.distance || Infinity) - (b.distance || Infinity);
     });
 
@@ -95,10 +115,17 @@ export default function ListSearchPage() {
     );
   };
 
-  if (loading) {
+  if (loading || seedInitializing) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">加载中...</div>
+        <div className="text-center">
+          <div className="text-gray-500 mb-2">
+            {seedInitializing ? "正在初始化数据..." : "加载中..."}
+          </div>
+          {seedInitializing && (
+            <div className="text-sm text-gray-400">首次加载需要几秒钟</div>
+          )}
+        </div>
       </div>
     );
   }
@@ -214,13 +241,27 @@ export default function ListSearchPage() {
             </Link>
           ))}
 
+          {/* 空状态 - 优化引导 */}
           {filteredSpots.length === 0 && (
             <div className="text-center py-12">
               <div className="text-4xl mb-4">🚗</div>
-              <h3 className="text-lg font-medium text-gray-900">
-                没有找到符合条件的车位
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                暂无可用车位
               </h3>
-              <p className="text-gray-500 mt-2">尝试调整筛选条件</p>
+              <p className="text-gray-500 mb-6">
+                成为第一个发布车位的业主，让闲置资源创造价值
+              </p>
+              <Link
+                href="/owner/publish"
+                className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              >
+                + 发布我的车位
+              </Link>
+              <div className="mt-6 text-sm text-gray-400">
+                <Link href="/" className="text-blue-600 hover:underline">
+                  ← 返回首页
+                </Link>
+              </div>
             </div>
           )}
         </div>
