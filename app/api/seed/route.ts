@@ -1,6 +1,5 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { successResponse, errorResponse } from "@/lib/api-response";
 
 // 种子车位数据
 const seedSpots = [
@@ -94,14 +93,14 @@ const seedSpots = [
   },
 ];
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     // 检查是否已有数据
     const existingSpots = await prisma.parkingSpot.count();
     if (existingSpots > 0) {
-      return successResponse({
-        message: "种子数据已存在，跳过初始化",
-        count: existingSpots,
+      return NextResponse.json({
+        success: true,
+        data: { message: "种子数据已存在，跳过初始化", count: existingSpots },
       });
     }
 
@@ -128,15 +127,21 @@ export async function POST(req: NextRequest) {
       createdSpots.push(created);
     }
 
-    return successResponse({
-      message: "种子数据初始化成功",
-      ownerId: seedOwner.id,
-      spotsCount: createdSpots.length,
-      spots: createdSpots.map((s) => ({ id: s.id, title: s.title })),
+    return NextResponse.json({
+      success: true,
+      data: {
+        message: "种子数据初始化成功",
+        ownerId: seedOwner.id,
+        spotsCount: createdSpots.length,
+        spots: createdSpots.map((s) => ({ id: s.id, title: s.title })),
+      },
     });
   } catch (error) {
     console.error("种子数据初始化失败:", error);
-    return errorResponse("种子数据初始化失败");
+    return NextResponse.json(
+      { success: false, error: "种子数据初始化失败" },
+      { status: 500 }
+    );
   }
 }
 
@@ -146,12 +151,18 @@ export async function GET() {
     const spotCount = await prisma.parkingSpot.count();
     const userCount = await prisma.user.count();
 
-    return successResponse({
-      hasSeedData: spotCount > 0,
-      spotsCount: spotCount,
-      usersCount: userCount,
+    return NextResponse.json({
+      success: true,
+      data: {
+        hasSeedData: spotCount > 0,
+        spotsCount: spotCount,
+        usersCount: userCount,
+      },
     });
   } catch (error) {
-    return errorResponse("获取状态失败");
+    return NextResponse.json(
+      { success: false, error: "获取状态失败" },
+      { status: 500 }
+    );
   }
 }
