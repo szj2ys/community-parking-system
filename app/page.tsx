@@ -6,8 +6,10 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const session = await auth();
   const user = session?.user;
-  const isOwner = user?.role === "OWNER";
-  const isTenant = user?.role === "TENANT";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userRole = (user as any)?.role;
+  const isOwner = userRole === "OWNER";
+  const isTenant = userRole === "TENANT";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -18,7 +20,8 @@ export default async function HomePage() {
           <div className="flex items-center gap-4">
             {user && (
               <span className="text-sm text-gray-600">
-                {user.phone}
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {(user as any).phone}
                 <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
                   {isOwner ? "业主" : "租户"}
                 </span>
