@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const session = await auth();
   const user = session?.user;

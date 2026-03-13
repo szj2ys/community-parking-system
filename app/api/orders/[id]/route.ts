@@ -1,0 +1,180 @@
+import { NextRequest, NextResponse } from "next/server";
+import { successResponse, errorResponse } from "@/lib/api-response";
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+
+// 确认订单
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    const { id } = await params;
+
+    if (!session?.user) {
+      return NextResponse.json(errorResponse("UNAUTHORIZED", "请先登录"), {
+        status: 401,
+      });
+    }
+
+    const body = await request.json();
+    const { action } = body; // "confirm" | "reject" | "cancel"
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        spot: {
+          select: { ownerId: true, title: true },
+        },
+      },
+    });
+
+    if (!order) {
+      return NextResponse.json(errorResponse("NOT_FOUND", "订单不存在"), {
+        status: 404,
+      });
+    }
+
+    const userRole = (session.user as any).role;
+    const userId = session.user.id;
+
+    let newStatus = order.status;
+
+    if (action === "confirm") {
+      // 只有业主可以确认
+      if (userRole !== "OWNER" || order.spot.ownerId !== userId) {
+        return NextResponse.json(errorResponse("FORBIDDEN", "无权操作"), {
+          status: 403,
+        });
+      }
+      if (order.status !== "PENDING") {
+        return NextResponse.json(errorResponse("INVALID_STATUS", "订单状态不正确"), {
+          status: 400,
+        });
+      }
+      newStatus = "CONFIRMED";
+    } else if (action === "reject") {
+      // 只有业主可以拒绝
+      if (userRole !== "OWNER" || order.spot.ownerId !== userId) {
+        return NextResponse.json(errorResponse("FORBIDDEN", "无权操作"), {
+          status: 403,
+        });
+      }
+      if (order.status !== "PENDING") {
+        return NextResponse.json(errorResponse("INVALID_STATUS", "订单状态不正确"), {
+          status: 400,
+        });
+      }
+      newStatus = "REJECTED";
+    } else if (action === "cancel") {
+      // 租户可以取消自己的订单
+      if (order.tenantId !== userId) {
+        return NextResponse.json(errorResponse("FORBIDDEN", "无权操作"), {
+          status: 403,
+        });
+      }
+      if (order.status !== "PENDING" && order.status !== "CONFIRMED") {
+        return NextResponse.json(errorResponse("INVALID_STATUS", "订单状态不正确"), {
+          status: 400,
+        });
+      }
+      newStatus = "CANCELLED";
+    } else if (action === "complete") {
+      // 业主可以标记完成
+      if (userRole !== "OWNER" || order.spot.ownerId !== userId) {
+        return NextResponse.json(errorResponse("FORBIDDEN", "无权操作"), {
+          status: 403,
+        });
+      }
+      if (order.status !== "IN_PROGRESS") {
+        return NextResponse.json(errorResponse("INVALID_STATUS", "订单状态不正确"), {
+          status: 400,
+        });
+      }
+      newStatus = "COMPLETED";
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id },
+      data: { status: newStatus },
+      include: {
+        spot: {
+          select: { id: true, title: true, address: true },
+        },
+        tenant: {
+          select: { id: true, name: true, phone: true },
+        },
+      },
+    });
+
+    return NextResponse.json(
+      successResponse(updatedOrder, "操作成功")
+    );
+  } catch (error) {
+    console.error("更新订单失败:", error);
+    return NextResponse.json(errorResponse("UPDATE_FAILED", "操作失败"), {
+      status: 500,
+    });
+  }
+}
+
+// 获取订单详情
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    const { id } = await params;
+
+    if (!session?.user) {
+      return NextResponse.json(errorResponse("UNAUTHORIZED", "请先登录"), {
+        status: 401,
+      });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        spot: {
+          include: {
+            owner: {
+              select: { id: true, name: true, phone: true },
+            },
+          },
+        },
+        tenant: {
+          select: { id: true, name: true, phone: true },
+        },
+      },
+    });
+
+    if (!order) {
+      return NextResponse.json(errorResponse("NOT_FOUND", "订单不存在"), {
+        status: 404,
+      });
+    }
+
+    // 检查权限（租户或业主可以查看）
+    const userId = session.user.id;
+    const userRole = (session.user as any).role;
+
+    if (
+      order.tenantId !== userId &&
+      !(userRole === "OWNER" && order.spot.ownerId === userId)
+    ) {
+      return NextResponse.json(errorResponse("FORBIDDEN", "无权查看"), {
+        status: 403,
+      });
+    }
+
+    return NextResponse.json(successResponse(order));
+  } catch (error) {
+    console.error("获取订单详情失败:", error);
+    return NextResponse.json(
+      errorResponse("FETCH_FAILED", "获取订单详情失败"),
+      { status: 500 }
+    );
+  }
+}

@@ -25,7 +25,7 @@ export function verifyCode(phone: string, code: string): boolean {
   return codeStore.get(phone) === code;
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const nextAuth = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   pages: {
@@ -79,18 +79,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         token.role = (user as any).role;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         token.phone = (user as any).phone;
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (session.user as any).id = token.sub!;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (session.user as any).role = token.role as string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (session.user as any).phone = token.phone as string;
       }
       return session;
     },
   },
 });
+
+export const { handlers, auth, signIn, signOut } = nextAuth;
