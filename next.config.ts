@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Turbopack is enabled by default in Next.js 16
+  // Server-side rendering with API routes support
+  // Deploy to Vercel for best compatibility
 };
 
 export default nextConfig;
