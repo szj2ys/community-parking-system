@@ -1,18 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { track } from "@/lib/analytics";
+import {
+  storeReferralCode,
+  getStoredReferralCode,
+  clearStoredReferralCode,
+  isValidReferralCodeFormat,
+} from "@/lib/referral";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [appliedReferralCode, setAppliedReferralCode] = useState<string | null>(null);
+
+  // 处理邀请码：从 URL 或 localStorage 获取
+  useEffect(() => {
+    // 优先从 URL 获取
+    const urlRef = searchParams.get("ref");
+    if (urlRef && isValidReferralCodeFormat(urlRef)) {
+      storeReferralCode(urlRef);
+      setAppliedReferralCode(urlRef);
+      return;
+    }
+
+    // 从 localStorage 获取
+    const storedCode = getStoredReferralCode();
+    if (storedCode) {
+      setAppliedReferralCode(storedCode);
+    }
+  }, [searchParams]);
 
   const sendCode = async () => {
     if (!/^1[3-9]\d{9}$/.test(phone)) {
@@ -63,6 +88,7 @@ export default function LoginPage() {
       const result = await signIn("credentials", {
         phone,
         code,
+        referralCode: appliedReferralCode,
         redirect: false,
       });
 
@@ -94,6 +120,33 @@ export default function LoginPage() {
           {error && (
             <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">
               {error}
+            </div>
+          )}
+
+          {/* 已应用的邀请码 */}
+          {appliedReferralCode && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm text-green-700">已应用邀请码：</span>
+                  <span className="font-mono font-medium text-green-800">
+                    {appliedReferralCode}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearStoredReferralCode();
+                    setAppliedReferralCode(null);
+                  }}
+                  className="text-xs text-green-600 hover:text-green-800 underline"
+                >
+                  清除
+                </button>
+              </div>
+              <p className="text-xs text-green-600 mt-1">
+                注册成功后，邀请人将在您完成首单时获得奖励
+              </p>
             </div>
           )}
 
@@ -148,5 +201,22 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full p-8 bg-white rounded-xl shadow-lg">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-900">社区车位租赁</h1>
+            <p className="mt-2 text-gray-600">加载中...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

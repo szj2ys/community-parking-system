@@ -28,12 +28,17 @@ model User {
   role          UserRole  @default(TENANT)
   name          String?
   avatar        String?
+  referralCode  String?   @unique @map("referral_code")
+  referredBy    String?   @map("referred_by")
+  referralRewards Decimal @default(0) @map("referral_rewards") @db.Decimal(10, 2)
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   // 关系
   ownedSpots    ParkingSpot[] @relation("OwnerSpots")
   orders        Order[]       @relation("TenantOrders")
+  sentReferrals ReferralRecord[] @relation("Referrer")
+  receivedReferrals ReferralRecord[] @relation("Referee")
 
   @@map("users")
 }
@@ -102,4 +107,25 @@ model Order {
   @@index([spotId])
   @@index([status])
   @@map("orders")
+}
+
+// 邀请记录模型
+model ReferralRecord {
+  id            String    @id @default(cuid())
+  referrerId    String    @map("referrer_id")
+  refereeId     String    @map("referee_id")
+  rewardAmount  Decimal   @default(0) @map("reward_amount") @db.Decimal(10, 2)
+  status        String    @default("pending")
+  triggeredByOrderId String? @map("triggered_by_order_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  rewardedAt    DateTime? @map("rewarded_at")
+
+  // 关系
+  referrer      User      @relation("Referrer", fields: [referrerId], references: [id])
+  referee       User      @relation("Referee", fields: [refereeId], references: [id])
+
+  @@unique([refereeId])
+  @@index([referrerId])
+  @@index([status])
+  @@map("referral_records")
 }

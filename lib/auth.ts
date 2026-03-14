@@ -5,10 +5,12 @@ import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import { z } from "zod";
 import { UserRole, AuthUser } from "@/types";
+import { generateReferralCode, isValidReferralCodeFormat } from "./referral";
 
 const credentialsSchema = z.object({
   phone: z.string().regex(/^1[3-9]\d{9}$/, "无效的手机号"),
   code: z.string().regex(/^\d{6}$/, "验证码必须是6位数字"),
+  referralCode: z.string().optional(),
 });
 
 // 模拟验证码存储 (生产环境使用 Redis)
@@ -46,7 +48,7 @@ const nextAuth = NextAuth({
           return null;
         }
 
-        const { phone, code } = parsed.data;
+        const { phone, code, referralCode: inputReferralCode } = parsed.data;
 
         // MVP阶段：直接验证，不检查验证码
         // 生产环境：verifyCode(phone, code)
@@ -60,12 +62,40 @@ const nextAuth = NextAuth({
         });
 
         if (!user) {
+          // 生成用户的唯一邀请码
+          const userReferralCode = generateReferralCode();
+
+          // 验证输入的邀请码（如果有）
+          let referrerId: string | undefined;
+          if (inputReferralCode && isValidReferralCodeFormat(inputReferralCode)) {
+            const referrer = await prisma.user.findUnique({
+              where: { referralCode: inputReferralCode },
+            });
+            if (referrer && referrer.phone !== phone) {
+              referrerId = referrer.id;
+            }
+          }
+
+          // 创建新用户
           user = await prisma.user.create({
             data: {
               phone,
               role: UserRole.TENANT,
+              referralCode: userReferralCode,
+              referredBy: referrerId,
             },
           });
+
+          // 如果有邀请人，创建邀请记录
+          if (referrerId) {
+            await prisma.referralRecord.create({
+              data: {
+                referrerId,
+                refereeId: user.id,
+                status: "pending",
+              },
+            });
+          }
         }
 
         return {
