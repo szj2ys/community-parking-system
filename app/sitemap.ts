@@ -78,16 +78,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // Dynamic parking spot pages (limit to available spots)
-  const spots = await prisma.parkingSpot.findMany({
-    where: {
-      status: "AVAILABLE",
-    },
-    select: {
-      id: true,
-      updatedAt: true,
-    },
-    take: 1000, // Limit for performance
-  });
+  let spots: { id: string; updatedAt: Date }[] = [];
+  try {
+    spots = await prisma.parkingSpot.findMany({
+      where: {
+        status: "AVAILABLE",
+      },
+      select: {
+        id: true,
+        updatedAt: true,
+      },
+      take: 1000, // Limit for performance
+    });
+  } catch {
+    // Database not available during build
+    spots = [];
+  }
 
   const spotPages = spots.map((spot) => ({
     url: `${BASE_URL}/parking-spots/${spot.id}`,

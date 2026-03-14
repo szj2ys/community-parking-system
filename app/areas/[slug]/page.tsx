@@ -76,66 +76,76 @@ export async function generateMetadata({ params }: AreaPageProps): Promise<Metad
 
 // Get spot count for an area
 async function getAreaSpotCount(area: AreaData): Promise<number> {
-  const { calculateDistance } = await import("@/data/seo-areas");
+  try {
+    const { calculateDistance } = await import("@/data/seo-areas");
 
-  // Get all available spots
-  const spots = await prisma.parkingSpot.findMany({
-    where: {
-      status: "AVAILABLE",
-    },
-    select: {
-      latitude: true,
-      longitude: true,
-    },
-  });
-
-  // Count spots within area radius
-  return spots.filter((spot) => {
-    const distance = calculateDistance(
-      area.centerLatitude,
-      area.centerLongitude,
-      spot.latitude,
-      spot.longitude
-    );
-    return distance <= area.radius;
-  }).length;
-}
-
-// Get spots for an area
-async function getAreaSpots(area: AreaData) {
-  const { calculateDistance } = await import("@/data/seo-areas");
-
-  const spots = await prisma.parkingSpot.findMany({
-    where: {
-      status: "AVAILABLE",
-    },
-    include: {
-      owner: {
-        select: {
-          name: true,
-          phone: true,
-        },
+    // Get all available spots
+    const spots = await prisma.parkingSpot.findMany({
+      where: {
+        status: "AVAILABLE",
       },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+      select: {
+        latitude: true,
+        longitude: true,
+      },
+    });
 
-  // Filter and sort by distance
-  return spots
-    .map((spot) => ({
-      ...spot,
-      distance: calculateDistance(
+    // Count spots within area radius
+    return spots.filter((spot) => {
+      const distance = calculateDistance(
         area.centerLatitude,
         area.centerLongitude,
         spot.latitude,
         spot.longitude
-      ),
-    }))
-    .filter((spot) => spot.distance <= area.radius)
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, 20);
+      );
+      return distance <= area.radius;
+    }).length;
+  } catch {
+    // Return 0 if database is not available (e.g., during build)
+    return 0;
+  }
+}
+
+// Get spots for an area
+async function getAreaSpots(area: AreaData) {
+  try {
+    const { calculateDistance } = await import("@/data/seo-areas");
+
+    const spots = await prisma.parkingSpot.findMany({
+      where: {
+        status: "AVAILABLE",
+      },
+      include: {
+        owner: {
+          select: {
+            name: true,
+            phone: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // Filter and sort by distance
+    return spots
+      .map((spot) => ({
+        ...spot,
+        distance: calculateDistance(
+          area.centerLatitude,
+          area.centerLongitude,
+          spot.latitude,
+          spot.longitude
+        ),
+      }))
+      .filter((spot) => spot.distance <= area.radius)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 20);
+  } catch {
+    // Return empty array if database is not available (e.g., during build)
+    return [];
+  }
 }
 
 export default async function AreaPage({ params }: AreaPageProps) {

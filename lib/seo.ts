@@ -20,7 +20,7 @@ export interface MetaTagsOptions {
   keywords?: string[];
   canonicalUrl?: string;
   ogImage?: string;
-  ogType?: "website" | "article" | "product";
+  ogType?: "website" | "article";
   twitterCard?: "summary" | "summary_large_image";
   noIndex?: boolean;
   noFollow?: boolean;
