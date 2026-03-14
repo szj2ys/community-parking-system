@@ -3,6 +3,8 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { maskPhoneNumber } from "@/lib/privacy";
+import { sendNotificationAsync } from "@/lib/notifications";
+import { formatTemplateVariables } from "@/lib/notification-templates";
 import { z } from "zod";
 
 const createOrderSchema = z.object({
@@ -123,7 +125,7 @@ export async function POST(request: NextRequest) {
           spot: {
             include: {
               owner: {
-                select: { id: true, name: true, phone: true },
+                select: { id: true, name: true, phone: true, wxOpenid: true },
               },
             },
           },
@@ -142,6 +144,29 @@ export async function POST(request: NextRequest) {
         },
       },
     };
+
+    // 异步发送新订单通知给车位主（不阻塞响应）
+    try {
+      const vars = formatTemplateVariables(
+        order.spot.address,
+        order.startTime,
+        order.endTime,
+        Number(order.totalPrice),
+        order.id
+      );
+
+      sendNotificationAsync(
+        order.spot.owner.id,
+        order.id,
+        "NEW_ORDER",
+        vars,
+        order.spot.owner.phone,
+        order.spot.owner.wxOpenid || undefined
+      );
+    } catch (notifyError) {
+      // 通知发送失败不影响订单创建结果
+      console.error("发送新订单通知失败:", notifyError);
+    }
 
     return NextResponse.json(successResponse(maskedOrder, "预订申请已提交"));
   } catch (error: any) {

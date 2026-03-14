@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { OrderStatus } from "@prisma/client";
 
 const searchSchema = z.object({
   lat: z.coerce.number().min(-90).max(90).optional(),
@@ -10,6 +11,8 @@ const searchSchema = z.object({
   minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
   status: z.enum(["AVAILABLE", "RENTED", "UNAVAILABLE"]).optional(),
+  startTime: z.coerce.date().optional(),
+  endTime: z.coerce.date().optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -32,7 +35,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { lat, lng, radius, minPrice, maxPrice, status } = parsed.data;
+    const { lat, lng, radius, minPrice, maxPrice, status, startTime, endTime } = parsed.data;
+
+    // 验证时间参数
+    if ((startTime && !endTime) || (!startTime && endTime)) {
+      return NextResponse.json(
+        errorResponse("INVALID_TIME", "开始时间和结束时间必须同时提供"),
+        { status: 400 }
+      );
+    }
+
+    if (startTime && endTime && startTime >= endTime) {
+      return NextResponse.json(
+        errorResponse("INVALID_TIME_RANGE", "结束时间必须晚于开始时间"),
+        { status: 400 }
+      );
+    }
 
     // 构建查询条件
     const where: any = {};
@@ -80,7 +98,7 @@ export async function GET(request: NextRequest) {
     });
 
     // 计算实际距离并排序
-    const spotsWithDistance = spots.map((spot: { latitude: number; longitude: number; [key: string]: unknown }) => {
+    const spotsWithDistance = spots.map((spot: { id: string; latitude: number; longitude: number; [key: string]: unknown }) => {
       let distance = null;
       if (lat !== undefined && lng !== undefined) {
         // 简化的 Haversine 距离计算
@@ -104,7 +122,32 @@ export async function GET(request: NextRequest) {
       spotsWithDistance.sort((a: { distance?: number | null }, b: { distance?: number | null }) => (a.distance || 0) - (b.distance || 0));
     }
 
-    return NextResponse.json(successResponse(spotsWithDistance));
+    // 如果提供了时间范围，过滤出可用的车位
+    let availableSpots = spotsWithDistance;
+    if (startTime && endTime) {
+      // 查询这些车位在指定时间段内的订单
+      const spotIds = spotsWithDistance.map((s: { id: string }) => s.id);
+
+      const conflictingOrders = await prisma.order.findMany({
+        where: {
+          spotId: { in: spotIds },
+          status: { in: [OrderStatus.PENDING, OrderStatus.CONFIRMED] },
+          // 时间重叠条件：order.startTime < query.endTime AND order.endTime > query.startTime
+          startTime: { lt: endTime },
+          endTime: { gt: startTime },
+        },
+        select: {
+          spotId: true,
+        },
+      });
+
+      const unavailableSpotIds = new Set(conflictingOrders.map(o => o.spotId));
+      availableSpots = spotsWithDistance.filter(
+        (s: { id: string }) => !unavailableSpotIds.has(s.id)
+      );
+    }
+
+    return NextResponse.json(successResponse(availableSpots));
   } catch (error) {
     console.error("搜索车位失败:", error);
     return NextResponse.json(errorResponse("SEARCH_FAILED", "搜索失败"), {

@@ -2,18 +2,27 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { ParkingSpot, SpotStatus } from "@/types";
-import StatusBadge from "@/components/StatusBadge";
+import SpotCard from "@/components/SpotCard";
 
 export default function ListSearchClient() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [spots, setSpots] = useState<(ParkingSpot & { distance?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [seedInitializing, setSeedInitializing] = useState(false);
   const [filters, setFilters] = useState({
-    minPrice: "",
-    maxPrice: "",
-    sortBy: "distance",
+    minPrice: searchParams.get("minPrice") || "",
+    maxPrice: searchParams.get("maxPrice") || "",
+    sortBy: searchParams.get("sortBy") || "distance",
   });
+
+  // 时间筛选状态
+  const [startTime, setStartTime] = useState<string>(searchParams.get("startTime") || "");
+  const [endTime, setEndTime] = useState<string>(searchParams.get("endTime") || "");
+  const [timeError, setTimeError] = useState<string>("");
 
   // 自动初始化种子数据
   useEffect(() => {
@@ -39,18 +48,26 @@ export default function ListSearchClient() {
 
   useEffect(() => {
     fetchSpots();
-  }, []);
+  }, [startTime, endTime]);
 
   const fetchSpots = async () => {
     try {
       let url = "/api/parking-spots/search?radius=50";
 
+      // 添加时间参数到URL
+      if (startTime && endTime) {
+        url += `&startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}`;
+      }
+
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           async (position) => {
             const { latitude, longitude } = position.coords;
-            url = `/api/parking-spots/search?lat=${latitude}&lng=${longitude}&radius=50`;
-            const res = await fetch(url);
+            let finalUrl = `/api/parking-spots/search?lat=${latitude}&lng=${longitude}&radius=50`;
+            if (startTime && endTime) {
+              finalUrl += `&startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}`;
+            }
+            const res = await fetch(finalUrl);
             const data = await res.json();
             if (data.success) {
               setSpots(data.data);
@@ -78,6 +95,77 @@ export default function ListSearchClient() {
       console.error("获取车位失败:", err);
       setLoading(false);
     }
+  };
+
+  // 处理开始时间变化
+  const handleStartTimeChange = (value: string) => {
+    setStartTime(value);
+    setTimeError("");
+
+    if (value && endTime) {
+      if (new Date(value) >= new Date(endTime)) {
+        setTimeError("结束时间必须晚于开始时间");
+        return;
+      }
+    }
+
+    updateUrlParams();
+  };
+
+  // 处理结束时间变化
+  const handleEndTimeChange = (value: string) => {
+    setEndTime(value);
+    setTimeError("");
+
+    if (startTime && value) {
+      if (new Date(startTime) >= new Date(value)) {
+        setTimeError("结束时间必须晚于开始时间");
+        return;
+      }
+    }
+
+    updateUrlParams();
+  };
+
+  // 立即可用快捷选项
+  const setImmediateAvailability = () => {
+    const now = new Date();
+    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+
+    const formatLocalDateTime = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
+    setStartTime(formatLocalDateTime(now));
+    setEndTime(formatLocalDateTime(oneHourLater));
+    setTimeError("");
+    updateUrlParams();
+  };
+
+  // 清除时间筛选
+  const clearTimeFilter = () => {
+    setStartTime("");
+    setEndTime("");
+    setTimeError("");
+    updateUrlParams();
+  };
+
+  // 更新URL参数（支持分享）
+  const updateUrlParams = () => {
+    const params = new URLSearchParams();
+    if (startTime) params.set("startTime", startTime);
+    if (endTime) params.set("endTime", endTime);
+    if (filters.minPrice) params.set("minPrice", filters.minPrice);
+    if (filters.maxPrice) params.set("maxPrice", filters.maxPrice);
+    if (filters.sortBy !== "distance") params.set("sortBy", filters.sortBy);
+
+    const newUrl = `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}`;
+    router.push(newUrl, { scroll: false });
   };
 
   // 过滤和排序
@@ -135,6 +223,62 @@ export default function ListSearchClient() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* 筛选器 */}
         <div className="bg-white rounded-xl shadow p-4 mb-6">
+          {/* 时间筛选 */}
+          <div className="mb-4 pb-4 border-b border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-gray-900">时间筛选</h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={setImmediateAvailability}
+                  className="px-3 py-1.5 bg-blue-50 text-blue-600 text-sm rounded-full hover:bg-blue-100 transition-colors"
+                >
+                  立即预约
+                </button>
+                {(startTime || endTime) && (
+                  <button
+                    onClick={clearTimeFilter}
+                    className="px-3 py-1.5 text-gray-500 text-sm hover:text-gray-700 transition-colors"
+                  >
+                    清除时间
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-4 items-start">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  开始时间
+                </label>
+                <input
+                  type="datetime-local"
+                  value={startTime}
+                  onChange={(e) => handleStartTimeChange(e.target.value)}
+                  className="w-48 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  结束时间
+                </label>
+                <input
+                  type="datetime-local"
+                  value={endTime}
+                  onChange={(e) => handleEndTimeChange(e.target.value)}
+                  className="w-48 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+            </div>
+            {timeError && (
+              <p className="mt-2 text-sm text-red-600">{timeError}</p>
+            )}
+            {startTime && endTime && !timeError && (
+              <p className="mt-2 text-sm text-green-600">
+                已筛选 {new Date(startTime).toLocaleString()} - {new Date(endTime).toLocaleString()} 可用的车位
+              </p>
+            )}
+          </div>
+
+          {/* 价格和排序筛选 */}
           <div className="flex flex-wrap gap-4 items-end">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -180,9 +324,10 @@ export default function ListSearchClient() {
               </select>
             </div>
             <button
-              onClick={() =>
-                setFilters({ minPrice: "", maxPrice: "", sortBy: "distance" })
-              }
+              onClick={() => {
+                setFilters({ minPrice: "", maxPrice: "", sortBy: "distance" });
+                clearTimeFilter();
+              }}
               className="px-4 py-2 text-gray-600 hover:text-gray-900"
             >
               重置
@@ -193,56 +338,13 @@ export default function ListSearchClient() {
         {/* 结果列表 */}
         <div className="space-y-4">
           {filteredSpots.map((spot) => (
-            <Link
+            <SpotCard
               key={spot.id}
-              href={`/parking-spots/${spot.id}`}
-              className="block bg-white rounded-xl shadow hover:shadow-md transition-shadow p-4"
-            >
-              <div className="flex gap-4">
-                {/* 图片缩略图 */}
-                <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                  {spot.images && spot.images.length > 0 ? (
-                    <img
-                      src={spot.images[0]}
-                      alt={spot.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-lg">{spot.title}</h3>
-                        <StatusBadge status={spot.status} />
-                      </div>
-                      <p className="text-gray-500 text-sm mt-1">{spot.address}</p>
-                      <p className="text-gray-600 text-sm mt-2 line-clamp-2">
-                        {spot.description || "暂无描述"}
-                      </p>
-                      {spot.distance !== undefined && (
-                        <p className="text-xs text-blue-600 mt-2">
-                          距您 {spot.distance.toFixed(2)} km
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right ml-4 flex-shrink-0">
-                      <div className="text-2xl font-bold text-blue-600">
-                        ¥{spot.pricePerHour}
-                      </div>
-                      <div className="text-sm text-gray-400">/小时</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
+              spot={spot}
+              startTime={startTime}
+              endTime={endTime}
+              isAvailable={true}
+            />
           ))}
 
           {/* 空状态 - 优化引导 */}

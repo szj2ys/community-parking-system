@@ -31,6 +31,7 @@ model User {
   referralCode  String?   @unique @map("referral_code")
   referredBy    String?   @map("referred_by")
   referralRewards Decimal @default(0) @map("referral_rewards") @db.Decimal(10, 2)
+  notificationPrefs Json?    @default("{}") @map("notification_prefs") // 通知偏好设置
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -106,6 +107,7 @@ model Order {
   @@index([tenantId])
   @@index([spotId])
   @@index([status])
+  @@index([spotId, status, startTime, endTime])
   @@map("orders")
 }
 
