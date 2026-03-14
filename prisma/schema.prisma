@@ -106,6 +106,7 @@ model Order {
   @@index([tenantId])
   @@index([spotId])
   @@index([status])
+  @@index([spotId, status, startTime, endTime])
   @@map("orders")
 }
 
