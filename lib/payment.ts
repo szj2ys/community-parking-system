@@ -263,7 +263,7 @@ export async function decryptNotification(
   trade_state: string;
   amount: { total: number };
 }> {
-  const crypto = await import('crypto');
+  const crypto = await import('node:crypto');
 
   // Derive key from API key (MD5 hash, take first 32 chars for AES-256)
   const key = crypto.createHash('md5').update(apiKey).digest('hex').substring(0, 32);
@@ -275,8 +275,12 @@ export async function decryptNotification(
   const authTag = encryptedData.slice(-16);
   const encrypted = encryptedData.slice(0, -16);
 
-  // Create decipher
-  const decipher = crypto.createDecipherGCM('aes-256-gcm', Buffer.from(key), Buffer.from(nonce));
+  // Create decipher using createDecipheriv with GCM mode
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm',
+    Buffer.from(key),
+    Buffer.from(nonce)
+  );
   decipher.setAuthTag(authTag);
   decipher.setAAD(Buffer.from(associatedData));
 
