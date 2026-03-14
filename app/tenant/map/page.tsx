@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ParkingSpot } from "@/types";
+import { MapContainer, ParkingSpotMarkers } from "@/components/map";
 
 export default function MapSearchPage() {
   const [spots, setSpots] = useState<(ParkingSpot & { distance?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<ParkingSpot & { distance?: number } | null>(null);
+  const [mapInstance, setMapInstance] = useState<AMap.Map | null>(null);
 
   useEffect(() => {
     // 获取用户位置
@@ -43,6 +45,15 @@ export default function MapSearchPage() {
     }
   };
 
+  const handleListItemClick = (spot: ParkingSpot & { distance?: number }) => {
+    setSelectedSpot(spot);
+    // 地图定位到选中车位
+    if (mapInstance) {
+      mapInstance.setCenter([spot.longitude, spot.latitude]);
+      mapInstance.setZoom(16);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -71,34 +82,20 @@ export default function MapSearchPage() {
       </header>
 
       <div className="flex h-[calc(100vh-73px)]">
-        {/* 地图区域 (简化版) */}
-        <div className="flex-1 bg-gray-100 relative overflow-hidden">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-6xl mb-4">🗺️</div>
-              <p className="text-gray-500">地图视图</p>
-              <p className="text-sm text-gray-400 mt-2">
-                MVP阶段：使用列表展示附近车位
-              </p>
-            </div>
-          </div>
-
-          {/* 模拟地图上的标记 */}
-          {spots.slice(0, 5).map((spot, index) => (
-            <div
-              key={spot.id}
-              className="absolute cursor-pointer transform -translate-x-1/2 -translate-y-1/2"
-              style={{
-                left: `${20 + index * 15}%`,
-                top: `${30 + (index % 3) * 20}%`,
-              }}
-              onClick={() => setSelectedSpot(spot)}
-            >
-              <div className="bg-blue-600 text-white px-2 py-1 rounded-lg text-sm font-bold shadow-lg">
-                ¥{spot.pricePerHour}
-              </div>
-            </div>
-          ))}
+        {/* 地图区域 */}
+        <div className="flex-1 relative">
+          <MapContainer
+            center={userLocation || { lat: 39.9093, lng: 116.3974 }}
+            zoom={13}
+            onMapLoad={setMapInstance}
+            className="w-full h-full"
+          />
+          <ParkingSpotMarkers
+            map={mapInstance}
+            spots={spots}
+            selectedSpotId={selectedSpot?.id}
+            onMarkerClick={setSelectedSpot}
+          />
         </div>
 
         {/* 侧边栏列表 */}
@@ -118,7 +115,7 @@ export default function MapSearchPage() {
                 className={`p-4 cursor-pointer hover:bg-gray-50 ${
                   selectedSpot?.id === spot.id ? "bg-blue-50" : ""
                 }`}
-                onClick={() => setSelectedSpot(spot)}
+                onClick={() => handleListItemClick(spot)}
               >
                 <div className="flex justify-between items-start">
                   <div>

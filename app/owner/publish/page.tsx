@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import MapContainer from "@/components/map/MapContainer";
 
 export default function PublishSpotPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [mapInstance, setMapInstance] = useState<AMap.Map | null>(null);
+  const [marker, setMarker] = useState<AMap.Marker | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     address: "",
@@ -17,6 +20,83 @@ export default function PublishSpotPage() {
     availableFrom: "08:00",
     availableTo: "22:00",
   });
+
+  const handleMapClick = useCallback((lat: number, lng: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitude: lat.toFixed(6),
+      longitude: lng.toFixed(6),
+    }));
+
+    // Update or create marker
+    if (mapInstance && typeof window !== "undefined" && (window as typeof window & { AMap?: typeof AMap }).AMap) {
+      const AMapLib = (window as typeof window & { AMap: typeof AMap }).AMap;
+      if (marker) {
+        marker.setPosition([lng, lat]);
+      } else {
+        const newMarker = new AMapLib.Marker({
+          position: [lng, lat],
+          draggable: true,
+        });
+        newMarker.on("dragend", (e: AMap.MapsEvent) => {
+          const { lng: newLng, lat: newLat } = e.lnglat;
+          setFormData((prev) => ({
+            ...prev,
+            latitude: newLat.toFixed(6),
+            longitude: newLng.toFixed(6),
+          }));
+          // Reverse geocode
+          reverseGeocode(newLng, newLat);
+        });
+        newMarker.setMap(mapInstance);
+        setMarker(newMarker);
+      }
+    }
+
+    // Reverse geocode to get address
+    reverseGeocode(lng, lat);
+  }, [mapInstance, marker]);
+
+  const reverseGeocode = (lng: number, lat: number) => {
+    if (typeof AMap !== "undefined") {
+      AMap.plugin(["AMap.Geocoder"], () => {
+        const geocoder = new AMap.Geocoder({
+          radius: 1000,
+          extensions: "all",
+        });
+        geocoder.getAddress([lng, lat], (status: string, result: { regeocode: { formattedAddress: string } }) => {
+          if (status === "complete" && result.regeocode) {
+            setFormData((prev) => ({
+              ...prev,
+              address: result.regeocode.formattedAddress,
+            }));
+          }
+        });
+      });
+    }
+  };
+
+  const handleAddressSearch = () => {
+    if (!formData.address || !mapInstance) return;
+
+    if (typeof AMap !== "undefined") {
+      AMap.plugin(["AMap.Geocoder"], () => {
+        const geocoder = new AMap.Geocoder({
+          radius: 1000,
+        });
+        geocoder.getLocation(formData.address, (status: string, result: { geocodes: Array<{ location: { lng: number; lat: number }; address: string }> }) => {
+          if (status === "complete" && result.geocodes && result.geocodes.length > 0) {
+            const { lng, lat } = result.geocodes[0].location;
+            mapInstance.setCenter([lng, lat]);
+            mapInstance.setZoom(16);
+            handleMapClick(lat, lng);
+          } else {
+            alert("无法找到该地址，请尝试更详细的描述");
+          }
+        });
+      });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +132,7 @@ export default function PublishSpotPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-4">
           <Link href="/" className="text-gray-600 hover:text-gray-900">
             ← 返回
           </Link>
@@ -60,8 +140,25 @@ export default function PublishSpotPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-3xl mx-auto px-4 py-8">
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow p-6 space-y-6">
+          {/* 地图选址区域 */}
+          <div className="border rounded-lg p-4 bg-gray-50">
+            <h3 className="font-medium text-gray-900 mb-3">📍 在地图上选择车位位置</h3>
+            <div className="h-64 rounded-lg overflow-hidden border border-gray-200 mb-3">
+              <MapContainer
+                center={{ lat: 39.9093, lng: 116.3974 }}
+                zoom={12}
+                onMapClick={handleMapClick}
+                onMapLoad={setMapInstance}
+                className="w-full h-full"
+              />
+            </div>
+            <p className="text-sm text-gray-500">
+              点击地图选择位置，或搜索地址自动定位
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               车位标题 <span className="text-red-500">*</span>
@@ -80,14 +177,23 @@ export default function PublishSpotPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               详细地址 <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="例如：北京市朝阳区阳光花园小区地下停车场 B区123号"
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="例如：北京市朝阳区阳光花园小区地下停车场 B区123号"
+                required
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={handleAddressSearch}
+                className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 whitespace-nowrap"
+              >
+                搜索定位
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

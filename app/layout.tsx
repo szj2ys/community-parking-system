@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,6 +14,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
+      <head>
+        <Script id="amap-security-config" strategy="beforeInteractive">
+          {`window._AMapSecurityConfig = { securityJsCode: '${process.env.NEXT_PUBLIC_AMAP_SECURITY_CONFIG || ""}' }`}
+        </Script>
+      </head>
       <body className="antialiased">{children}</body>
     </html>
   );
