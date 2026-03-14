@@ -130,7 +130,7 @@ export function formatTemplateVariables(
     startTime: formatDate(startTime),
     endTime: formatDate(endTime),
     amount: amount.toFixed(2),
-    orderId: orderId.slice(-8), // 取订单号后8位
+    orderId: orderId.slice(-5), // 取订单号后5位
   };
 }
 

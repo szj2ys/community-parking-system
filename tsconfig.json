@@ -35,8 +35,8 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts",
-    "/Users/szj/Downloads/tmp/community-parking-system/.worktrees/T1-seed/.worktrees/T3-referral-rewards/.next/types/**/*.ts",
-    "/Users/szj/Downloads/tmp/community-parking-system/.worktrees/T1-seed/.worktrees/T3-referral-rewards/.next/dev/types/**/*.ts"
+    "/Users/szj/Downloads/tmp/community-parking-system/.next/types/**/*.ts",
+    "/Users/szj/Downloads/tmp/community-parking-system/.next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
