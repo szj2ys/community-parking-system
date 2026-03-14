@@ -2,6 +2,13 @@ import { auth } from "@/lib/auth";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth } from "date-fns";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "社区车位租赁 - 连接车位业主与租户的智能平台",
+  description: "发现附近闲置车位，轻松解决停车难题。业主发布车位赚取收益，租户按小时租赁灵活便捷。让闲置车位创造价值。",
+  keywords: ["车位租赁", "社区停车", "共享车位", "小时租", "停车", "车位出租", "附近车位", "闲置车位"],
+};
 
 export const dynamic = "force-dynamic";
 
