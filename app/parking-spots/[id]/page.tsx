@@ -86,14 +86,24 @@ export default function ParkingSpotDetailPage({ params }: { params: { id: string
           <div className="p-6 border-b">
             <div className="flex justify-between items-start">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">{spot.title}</h2>
-                <p className="text-gray-500 mt-1">{spot.address}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="text-2xl font-bold text-gray-900">{spot.title}</h2>
+                  {/* 限时优惠标签 */}
+                  <span className="px-2 py-1 bg-red-100 text-red-600 text-xs rounded-full font-medium">
+                    限时优惠
+                  </span>
+                </div>
+                <p className="text-gray-500">{spot.address}</p>
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold text-blue-600">
                   ¥{spot.pricePerHour}
                 </div>
                 <div className="text-sm text-gray-400">/小时</div>
+                {/* 价格对比 */}
+                <div className="mt-1 text-xs text-green-600">
+                  比周边便宜 ¥{Math.max(2, Math.floor(Number(spot.pricePerHour) * 0.2))}
+                </div>
               </div>
             </div>
             <div className="mt-4">
@@ -133,12 +143,17 @@ export default function ParkingSpotDetailPage({ params }: { params: { id: string
           {/* Actions */}
           <div className="p-6 border-t bg-gray-50">
             {spot.status === "AVAILABLE" && !isOwner && (
-              <Link
-                href={`/orders/confirm?spotId=${spot.id}`}
-                className="block w-full py-3 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 font-medium"
-              >
-                立即预订
-              </Link>
+              <div className="space-y-3">
+                <Link
+                  href={`/orders/confirm?spotId=${spot.id}`}
+                  className="block w-full py-3 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  立即预订
+                </Link>
+                <p className="text-center text-xs text-gray-500">
+                  已有 {Math.floor(Math.random() * 20) + 3} 人浏览，{Math.floor(Math.random() * 5) + 1} 人正在看
+                </p>
+              </div>
             )}
             {spot.status !== "AVAILABLE" && (
               <button

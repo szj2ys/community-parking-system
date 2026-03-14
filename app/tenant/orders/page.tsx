@@ -158,7 +158,7 @@ export default function TenantOrdersPage() {
               </div>
 
               {/* 操作按钮 */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {(order.status === "PENDING" || order.status === "CONFIRMED") && (
                   <button
                     onClick={() => handleCancel(order.id)}
@@ -167,6 +167,25 @@ export default function TenantOrdersPage() {
                     取消预订
                   </button>
                 )}
+                {/* 分享按钮 */}
+                <button
+                  onClick={() => {
+                    const shareText = `我在社区车位租赁平台预订了「${order.spot?.title}」，¥${order.totalPrice}，推荐给你！`;
+                    if (navigator.share) {
+                      navigator.share({
+                        title: "推荐车位",
+                        text: shareText,
+                        url: window.location.origin + "/tenant/list",
+                      });
+                    } else {
+                      navigator.clipboard.writeText(shareText + " " + window.location.origin + "/tenant/list");
+                      alert("分享文案已复制到剪贴板");
+                    }
+                  }}
+                  className="px-4 py-2 text-blue-600 hover:text-blue-700 text-sm border border-blue-200 rounded-lg hover:bg-blue-50"
+                >
+                  分享给好友
+                </button>
               </div>
             </div>
           ))}
@@ -185,6 +204,24 @@ export default function TenantOrdersPage() {
             </div>
           )}
         </div>
+
+        {/* 成为业主引导 */}
+        {orders.length > 0 && (
+          <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-900">您也有闲置车位？</h3>
+                <p className="text-sm text-gray-600 mt-1">发布车位，轻松赚取额外收益</p>
+              </div>
+              <Link
+                href="/owner/publish"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+              >
+                成为业主
+              </Link>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
