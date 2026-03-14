@@ -19,11 +19,114 @@ interface EventProperties {
   [key: string]: string | number | boolean | undefined;
 }
 
+interface QueuedEvent {
+  event: AnalyticsEvent;
+  properties: EventProperties;
+  timestamp: number;
+}
+
 // Simple in-memory queue for events before analytics is ready
-const eventQueue: Array<{ event: AnalyticsEvent; properties: EventProperties; timestamp: number }> = [];
+const eventQueue: QueuedEvent[] = [];
+
+// Batch queue for sending events to backend
+const batchQueue: QueuedEvent[] = [];
+const BATCH_SIZE = 5;
+const BATCH_INTERVAL = 5000; // 5 seconds
 
 let analyticsInitialized = false;
 let userId: string | null = null;
+let sessionId: string | null = null;
+let batchTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Generate a session ID
+ */
+function getSessionId(): string {
+  if (typeof window === 'undefined') return 'server';
+
+  if (!sessionId) {
+    // Try to get existing session from sessionStorage
+    const stored = sessionStorage.getItem('analytics_session_id');
+    if (stored) {
+      sessionId = stored;
+    } else {
+      // Generate new session ID
+      sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      sessionStorage.setItem('analytics_session_id', sessionId);
+    }
+  }
+  return sessionId;
+}
+
+/**
+ * Send batched events to backend
+ */
+async function flushBatch(): Promise<void> {
+  if (batchQueue.length === 0) return;
+
+  const events = [...batchQueue];
+  batchQueue.length = 0; // Clear queue
+
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const referrer = typeof document !== 'undefined' ? document.referrer : undefined;
+
+  // Send each event
+  const promises = events.map(async ({ event, properties, timestamp }) => {
+    const payload = {
+      event,
+      properties,
+      userId,
+      sessionId: getSessionId(),
+      pathname,
+      referrer,
+      timestamp,
+    };
+
+    try {
+      const response = await fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Analytics API error: ${response.status}`);
+      }
+    } catch (error) {
+      // Silently fail - analytics should not affect user experience
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Analytics] Failed to send event:', error);
+      }
+    }
+  });
+
+  await Promise.all(promises);
+}
+
+/**
+ * Queue event for batch sending
+ */
+function queueForBatch(event: AnalyticsEvent, properties: EventProperties, timestamp: number): void {
+  batchQueue.push({ event, properties, timestamp });
+
+  // Flush if batch is full
+  if (batchQueue.length >= BATCH_SIZE) {
+    if (batchTimeoutId) {
+      clearTimeout(batchTimeoutId);
+      batchTimeoutId = null;
+    }
+    flushBatch();
+    return;
+  }
+
+  // Schedule flush
+  if (!batchTimeoutId) {
+    batchTimeoutId = setTimeout(() => {
+      batchTimeoutId = null;
+      flushBatch();
+    }, BATCH_INTERVAL);
+  }
+}
 
 /**
  * Initialize analytics
@@ -33,6 +136,7 @@ export function initAnalytics(): void {
   if (analyticsInitialized) return;
 
   analyticsInitialized = true;
+  getSessionId(); // Ensure session ID is created
 
   // Flush any queued events
   while (eventQueue.length > 0) {
@@ -101,7 +205,6 @@ export function trackButtonClick(buttonName: string, properties?: EventPropertie
 
 /**
  * Send event to analytics endpoint
- * Currently logs to console; replace with actual analytics service
  */
 function sendEvent(event: AnalyticsEvent, properties: EventProperties, timestamp: number): void {
   const payload = {
@@ -118,8 +221,8 @@ function sendEvent(event: AnalyticsEvent, properties: EventProperties, timestamp
     console.log('[Analytics]', payload);
   }
 
-  // TODO: Send to actual analytics service
-  // Example: fetch('/api/analytics', { method: 'POST', body: JSON.stringify(payload) })
+  // Send to backend
+  queueForBatch(event, properties, timestamp);
 }
 
 /**
