@@ -85,6 +85,16 @@ export default async function HomePage() {
                   查看和处理预订请求
                 </p>
               </Link>
+              <Link
+                href="/user/invites"
+                className="p-6 bg-white rounded-xl shadow hover:shadow-md transition-shadow"
+              >
+                <div className="text-3xl mb-4">🎁</div>
+                <h3 className="font-semibold text-lg">我的邀请</h3>
+                <p className="text-gray-500 text-sm mt-2">
+                  邀请好友，赚取奖励
+                </p>
+              </Link>
             </>
           )}
 
@@ -118,6 +128,16 @@ export default async function HomePage() {
                 <h3 className="font-semibold text-lg">我的预订</h3>
                 <p className="text-gray-500 text-sm mt-2">
                   查看我的预订记录
+                </p>
+              </Link>
+              <Link
+                href="/user/invites"
+                className="p-6 bg-white rounded-xl shadow hover:shadow-md transition-shadow"
+              >
+                <div className="text-3xl mb-4">🎁</div>
+                <h3 className="font-semibold text-lg">我的邀请</h3>
+                <p className="text-gray-500 text-sm mt-2">
+                  邀请好友，赚取奖励
                 </p>
               </Link>
             </>
