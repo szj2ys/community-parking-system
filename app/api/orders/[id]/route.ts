@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { calculateReferralReward } from "@/lib/referral";
 
 // 确认订单
 export async function PATCH(
@@ -107,6 +108,48 @@ export async function PATCH(
         },
       },
     });
+
+    // 如果订单完成，触发邀请奖励
+    if (newStatus === "COMPLETED") {
+      try {
+        const tenantId = order.tenantId;
+        const orderAmount = Number(order.totalPrice);
+
+        // 查找该租户是否有待处理的邀请记录
+        const referralRecord = await prisma.referralRecord.findUnique({
+          where: { refereeId: tenantId },
+        });
+
+        if (referralRecord && referralRecord.status === "pending") {
+          const rewardAmount = calculateReferralReward(orderAmount);
+
+          // 使用事务更新邀请记录和推荐人奖励
+          await prisma.$transaction(async (tx) => {
+            await tx.referralRecord.update({
+              where: { id: referralRecord.id },
+              data: {
+                status: "rewarded",
+                rewardAmount,
+                triggeredByOrderId: id,
+                rewardedAt: new Date(),
+              },
+            });
+
+            await tx.user.update({
+              where: { id: referralRecord.referrerId },
+              data: {
+                referralRewards: {
+                  increment: rewardAmount,
+                },
+              },
+            });
+          });
+        }
+      } catch (rewardError) {
+        // 奖励发放失败不影响订单完成，记录错误即可
+        console.error("发放邀请奖励失败:", rewardError);
+      }
+    }
 
     return NextResponse.json(
       successResponse(updatedOrder, "操作成功")
