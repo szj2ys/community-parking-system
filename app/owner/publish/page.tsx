@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import MapContainer from "@/components/map/MapContainer";
 import ImageUploader from "@/components/ImageUploader";
+import { trackButtonClick } from "@/lib/analytics";
 
 export default function PublishSpotPage() {
   const router = useRouter();
@@ -103,6 +104,9 @@ export default function PublishSpotPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Track publish button click
+    trackButtonClick("发布车位", { title: formData.title, price: formData.pricePerHour });
 
     try {
       const res = await fetch("/api/parking-spots", {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ParkingSpot } from "@/types";
 import StatusBadge from "@/components/StatusBadge";
+import { trackButtonClick, track } from "@/lib/analytics";
 
 export default function ParkingSpotDetailPage({ params }: { params: { id: string } }) {
   const [spot, setSpot] = useState<ParkingSpot | null>(null);
@@ -21,6 +22,8 @@ export default function ParkingSpotDetailPage({ params }: { params: { id: string
       const data = await res.json();
       if (data.success) {
         setSpot(data.data);
+        // Track spot view
+        track("spot_view", { spotId: data.data.id, title: data.data.title, price: data.data.pricePerHour });
         // Check if current user is the owner
         // This is a simplified check - in real app you'd check from session
         setIsOwner(false); // Default to false for tenant view
@@ -198,6 +201,7 @@ export default function ParkingSpotDetailPage({ params }: { params: { id: string
               <div className="space-y-3">
                 <Link
                   href={`/orders/confirm?spotId=${spot.id}`}
+                  onClick={() => trackButtonClick("立即预订", { spotId: spot.id, price: spot.pricePerHour })}
                   className="block w-full py-3 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 font-medium"
                 >
                   立即预订

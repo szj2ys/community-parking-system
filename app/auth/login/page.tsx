@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { track } from "@/lib/analytics";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -68,6 +69,8 @@ export default function LoginPage() {
       if (result?.error) {
         setError("验证码错误或已过期");
       } else {
+        // Track successful login/signup
+        track("user_login", { phone });
         // 登录成功，跳转到首页
         router.push("/");
         router.refresh();

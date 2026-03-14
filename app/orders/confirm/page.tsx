@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ParkingSpot } from "@/types";
+import { trackButtonClick, track } from "@/lib/analytics";
 
 function OrderConfirmContent() {
   const router = useRouter();
@@ -67,6 +68,12 @@ function OrderConfirmContent() {
 
     setSubmitting(true);
 
+    // Track submit booking button click
+    trackButtonClick("提交预订申请", {
+      spotId: spot.id,
+      price: calculatedPrice,
+    });
+
     const startTime = `${formData.date}T${formData.startTime}`;
     const endTime = `${formData.date}T${formData.endTime}`;
 
@@ -85,6 +92,12 @@ function OrderConfirmContent() {
       const data = await res.json();
 
       if (data.success) {
+        // Track order creation
+        track("order_create", {
+          spotId: spot.id,
+          price: calculatedPrice,
+          hours: (new Date(`${formData.date}T${formData.endTime}`).getTime() - new Date(`${formData.date}T${formData.startTime}`).getTime()) / (1000 * 60 * 60),
+        });
         alert("预订申请已提交！请等待业主确认。");
         router.push("/orders");
       } else {
