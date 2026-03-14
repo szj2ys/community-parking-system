@@ -4,11 +4,11 @@ import { auth } from "@/lib/auth";
 import {
   getUserNotificationPrefs,
   updateUserNotificationPrefs,
-  NotificationPrefs,
 } from "@/lib/notifications";
 import {
   defaultNotificationPrefs,
   validateNotificationPrefs,
+  NotificationPrefs,
 } from "@/lib/notification-templates";
 
 /**
@@ -52,7 +52,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        errorResponse("INVALID_DATA", "请求数据格式错误"),
+        { status: 400 }
+      );
+    }
 
     // 验证请求体结构
     if (!body || typeof body !== "object") {

@@ -4,16 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import {
   sendNotificationAsync,
-  formatTemplateVariables,
 } from "@/lib/notifications";
-import { NotificationType } from "@/lib/notification-templates";
-import { z } from "zod";
+import { NotificationType, formatTemplateVariables } from "@/lib/notification-templates";
 import { z } from "zod";
 
 const sendNotificationSchema = z.object({
   orderId: z.string().min(1, "订单ID不能为空"),
   type: z.enum(["NEW_ORDER", "PAYMENT_SUCCESS", "ORDER_CANCELLED"], {
-    errorMap: () => ({ message: "无效的通知类型" }),
+    message: "无效的通知类型",
   }),
 });
 
@@ -35,8 +33,9 @@ export async function POST(request: NextRequest) {
     const parsed = sendNotificationSchema.safeParse(body);
 
     if (!parsed.success) {
+      const errorMessage = parsed.error.issues?.[0]?.message || "数据格式错误";
       return NextResponse.json(
-        errorResponse("INVALID_DATA", parsed.error.errors[0]?.message || "数据格式错误"),
+        errorResponse("INVALID_DATA", errorMessage),
         { status: 400 }
       );
     }
