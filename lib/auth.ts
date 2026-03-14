@@ -14,15 +14,12 @@ const credentialsSchema = z.object({
   referralCode: z.string().optional(),
 });
 
-const credentialsSchema = z.object({
-  phone: z.string().regex(/^1[3-9]\d{9}$/, "无效的手机号"),
-  code: z.string().regex(/^\d{6}$/, "验证码必须是6位数字"),
-  referralCode: z.string().optional(),
-});
-
 const nextAuth = NextAuth({
   // Note: PrismaAdapter removed - we're using JWT strategy which doesn't need an adapter
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: 24 * 60 * 60 }, // 24 hours
+  jwt: {
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
   pages: {
     signIn: "/auth/login",
     error: "/auth/error",
@@ -42,9 +39,8 @@ const nextAuth = NextAuth({
 
         const { phone, code, referralCode: inputReferralCode } = parsed.data;
 
-        // MVP阶段：直接验证，不检查验证码
-        // 生产环境：verifyCode(phone, code)
-        if (code !== "000000" && !verifyCode(phone, code)) {
+        // 验证验证码
+        if (!verifyCode(phone, code)) {
           return null;
         }
 

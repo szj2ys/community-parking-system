@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { generateCode } from "@/lib/auth";
+import { generateCode } from "@/lib/auth-code";
+import { checkSMSRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const phoneSchema = z.object({
@@ -19,6 +20,24 @@ export async function POST(request: NextRequest) {
     }
 
     const { phone } = parsed.data;
+
+    // Check rate limits
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+               request.headers.get("x-real-ip") ||
+               "unknown";
+    const rateLimitResult = checkSMSRateLimit(phone, ip);
+
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        errorResponse("RATE_LIMITED", rateLimitResult.error),
+        {
+          status: 429,
+          headers: rateLimitResult.retryAfterSec
+            ? { "Retry-After": String(rateLimitResult.retryAfterSec) }
+            : undefined,
+        }
+      );
+    }
 
     // MVP阶段：生成并返回验证码
     // 生产环境：发送到用户手机

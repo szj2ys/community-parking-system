@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { maskPhoneNumber } from "@/lib/privacy";
 import { z } from "zod";
 
 const createOrderSchema = z.object({
@@ -88,30 +89,68 @@ export async function POST(request: NextRequest) {
     const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
     const totalPrice = Math.ceil(hours * Number(spot.pricePerHour));
 
-    // 创建订单
-    const order = await prisma.order.create({
-      data: {
-        spotId,
-        tenantId: session.user.id!,
-        startTime: start,
-        endTime: end,
-        totalPrice,
-        note,
-        status: "PENDING",
-      },
-      include: {
-        spot: {
-          include: {
-            owner: {
-              select: { id: true, name: true, phone: true },
+    // 使用事务创建订单，防止并发预订冲突
+    const order = await prisma.$transaction(async (tx) => {
+      // 检查是否有时间重叠的已确认/进行中/待确认的订单
+      const overlappingOrders = await tx.order.findMany({
+        where: {
+          spotId,
+          status: { in: ["PENDING", "CONFIRMED", "IN_PROGRESS"] },
+          // 时间重叠检查：新订单的开始时间早于现有订单的结束时间，且新订单的结束时间晚于现有订单的开始时间
+          AND: [
+            { startTime: { lt: end } },
+            { endTime: { gt: start } },
+          ],
+        },
+      });
+
+      if (overlappingOrders.length > 0) {
+        throw new Error("TIME_SLOT_BOOKED");
+      }
+
+      // 创建订单
+      return await tx.order.create({
+        data: {
+          spotId,
+          tenantId: session.user.id!,
+          startTime: start,
+          endTime: end,
+          totalPrice,
+          note,
+          status: "PENDING",
+        },
+        include: {
+          spot: {
+            include: {
+              owner: {
+                select: { id: true, name: true, phone: true },
+              },
             },
           },
         },
-      },
+      });
     });
 
-    return NextResponse.json(successResponse(order, "预订申请已提交"));
-  } catch (error) {
+    // Mask phone number in response
+    const maskedOrder = {
+      ...order,
+      spot: {
+        ...order.spot,
+        owner: {
+          ...order.spot.owner,
+          phone: maskPhoneNumber(order.spot.owner.phone),
+        },
+      },
+    };
+
+    return NextResponse.json(successResponse(maskedOrder, "预订申请已提交"));
+  } catch (error: any) {
+    if (error.message === "TIME_SLOT_BOOKED") {
+      return NextResponse.json(
+        errorResponse("TIME_SLOT_BOOKED", "该时段已被预订"),
+        { status: 409 }
+      );
+    }
     console.error("创建订单失败:", error);
     return NextResponse.json(errorResponse("CREATE_FAILED", "预订失败"), {
       status: 500,
@@ -134,7 +173,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const role = (session.user as any).role;
 
-    let where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (role === "TENANT") {
       where.tenantId = session.user.id;
@@ -167,7 +206,18 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(successResponse(orders));
+    // Mask phone numbers in response
+    const maskedOrders = orders.map((order) => ({
+      ...order,
+      tenant: order.tenant
+        ? {
+            ...order.tenant,
+            phone: maskPhoneNumber(order.tenant.phone),
+          }
+        : null,
+    }));
+
+    return NextResponse.json(successResponse(maskedOrders));
   } catch (error) {
     console.error("获取订单失败:", error);
     return NextResponse.json(errorResponse("FETCH_FAILED", "获取订单失败"), {

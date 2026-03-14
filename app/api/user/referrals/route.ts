@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { maskPhoneNumber } from "@/lib/privacy";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -49,7 +50,7 @@ export async function GET() {
     const invitedUsers = referrals.map((ref) => ({
       id: ref.referee.id,
       name: ref.referee.name,
-      phone: ref.referee.phone,
+      phone: maskPhoneNumber(ref.referee.phone),
       createdAt: ref.referee.createdAt.toISOString(),
       rewardAmount: Number(ref.rewardAmount),
     }));
