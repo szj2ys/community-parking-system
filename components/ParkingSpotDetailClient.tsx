@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ParkingSpot } from "@/types";
 import StatusBadge from "@/components/StatusBadge";
+import ShareButtons from "@/components/ShareButtons";
 import { trackButtonClick, track } from "@/lib/analytics";
 
 interface ParkingSpotDetailClientProps {
@@ -53,8 +54,13 @@ export default function ParkingSpotDetailClient({ spot }: ParkingSpotDetailClien
                 </div>
               </div>
             </div>
-            <div className="mt-4">
+            <div className="mt-4 flex items-center justify-between">
               <StatusBadge status={spot.status} size="md" />
+              <ShareButtons
+                url={`/parking-spots/${spot.id}`}
+                title={spot.title}
+                description={`${spot.address} - ¥${spot.pricePerHour}/小时`}
+              />
             </div>
           </div>
 
