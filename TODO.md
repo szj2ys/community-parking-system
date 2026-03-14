@@ -1,75 +1,77 @@
 > !! 请勿提交此文件 !!
 
-# T0-image · Phase 0
+# T0-analytics · Phase 0
 
-> 用户能够上传车位照片，让租户更直观地了解车位情况
+> 实现真实的数据收集，将用户行为数据发送到后端存储
 
 ## 上下文
 
-- **依赖**: T0-map 已合入 main（地图选址功能已完成）
-- **边界**: 本 Track 不修改地图相关代码，专注图片上传功能
+- **依赖**: 无 - analytics lib 已存在但只打印到 console
+- **边界**: 不删除现有 console.log，添加后端存储
 
 ## Tasks
 
-### 1. 安装 Vercel Blob SDK
+### 1. 创建 Analytics API
 
-- [x] 安装 `@vercel/blob` 依赖
-- **文件**: `package.json`
-- **验收**: `npm install` 成功，SDK 可用
+- [ ] 创建 `app/api/analytics/route.ts`
+- **功能**:
+  - POST: 接收事件数据 { event, properties, userId, timestamp }
+  - 存储到数据库 (AnalyticsEvent 表)
+  - 验证事件类型白名单
+- [ ] 更新 `prisma/schema.prisma` 添加 AnalyticsEvent 模型
+- **模型字段**:
+  - id: cuid
+  - event: string (事件名)
+  - properties: JSON (事件属性)
+  - userId: string? (可选，关联用户)
+  - sessionId: string
+  - pathname: string (页面路径)
+  - createdAt: DateTime
 
-### 2. 创建图片上传 API
+### 2. 更新 Analytics Lib
 
-- [x] 创建 `/api/upload` API route，使用 Vercel Blob 处理图片上传
-- **文件**: `app/api/upload/route.ts`（新建）
-- **验收**: POST 请求能接收图片文件，返回图片 URL
-- **测试**: 上传图片后返回可访问的 URL
+- [ ] 修改 `lib/analytics.ts`
+- **改动**:
+  - sendEvent 函数改为调用 /api/analytics
+  - 保持 console.log 在 development 模式
+  - 添加队列机制防止请求堆积
+  - 错误处理：发送失败不阻塞用户操作
 
-### 3. 创建图片上传组件
+### 3. 添加页面浏览追踪
 
-- [x] 创建可复用的 ImageUploader 组件，支持多图上传、预览、删除
-- **文件**: `components/ImageUploader.tsx`（新建）
-- **验收**:
-  - 支持点击或拖拽上传
-  - 支持多图（最多5张）
-  - 显示上传进度和预览
-  - 可删除已选图片
-- **测试**: 组件渲染正常，交互流畅
+- [ ] 更新 `components/AnalyticsProvider.tsx`
+- **确保**:
+  - 所有页面自动追踪 page_view
+  - 包含 pathname, referrer, userAgent 信息
 
-### 4. 集成到车位发布页
+### 4. 运行迁移
 
-- [x] 在 owner/publish 页面添加图片上传区域
-- **文件**: `app/owner/publish/page.tsx`
-- **验收**:
-  - 页面显示图片上传组件
-  - 发布时图片 URL 随表单一起提交
-  - 支持编辑时修改图片（通过 PATCH API）
-
-### 5. 更新数据库 Schema
-
-- [x] ParkingSpot 模型已有 images 字段存储图片 URL 数组
-- **文件**: `prisma/schema.prisma`
-- **验收**: 无需迁移，字段已存在
-
-### 6. 更新车位详情页展示图片
-
-- [x] 在车位详情页显示图片轮播/画廊
-- **文件**: `app/parking-spots/[id]/page.tsx`
-- **验收**: 有图片时显示图片画廊，无图片时显示占位图
-
-实现好后需要使用 code-simplifier agent 进行代码优化。
+- [ ] `npx prisma migrate dev --name add_analytics`
+- [ ] `npx prisma generate`
 
 ## Done When
 
 - [ ] 所有 Tasks checkbox 已勾选
 - [ ] `npm run build` 无报错
-- [ ] `npx tsc --noEmit` 无类型错误
-- [ ] 手动测试：上传图片 → 发布车位 → 查看详情页显示图片
+- [ ] `npx tsc --noEmit` 通过
+- [ ] API 能接收并存储事件
+- [ ] 页面浏览自动记录
 
-## 测试规约
+---
 
-| 变更类型          | 要求                           |
-| ----------------- | ------------------------------ |
-| 工具函数 / 纯逻辑 | 单元测试：核心路径 + 边界 case |
-| UI 组件           | 组件测试：渲染 + 交互 + 状态   |
-| 跨模块 / API 交互 | 集成测试：模拟完整用户流程     |
-| 合入 main 前      | 冒烟测试：构建 + 全量测试通过  |
+### 验收标准
+
+**场景**: 用户访问页面
+- **Given**: 用户浏览任意页面
+- **When**: 页面加载完成
+- **Then**: AnalyticsEvent 表中增加 page_view 记录
+
+**场景**: 用户点击按钮
+- **Given**: 用户点击"立即预订"
+- **When**: 点击事件发生
+- **Then**: AnalyticsEvent 表中增加 button_click 记录
+
+### 测试
+
+- API 测试: POST /api/analytics 返回 200
+- 集成测试: 浏览页面后数据库有记录

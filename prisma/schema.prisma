@@ -129,3 +129,24 @@ model ReferralRecord {
   @@index([status])
   @@map("referral_records")
 }
+
+// 分析事件模型
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  event       String   // 事件名称
+  properties  Json     @default("{}") @map("properties") // 事件属性
+  userId      String?  @map("user_id")
+  sessionId   String   @map("session_id")
+  pathname    String   @map("pathname") // 页面路径
+  userAgent   String?  @map("user_agent")
+  referrer    String?  @map("referrer")
+  ip          String?  @map("ip") // IP地址
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([event])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([pathname])
+  @@map("analytics_events")
+}
