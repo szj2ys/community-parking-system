@@ -74,7 +74,7 @@ export function calculateReferralReward(orderAmount: number): number {
  * 将邀请码存储在 localStorage 中
  */
 export function storeReferralCode(code: string): void {
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
     localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, code);
   }
 }
@@ -84,7 +84,7 @@ export function storeReferralCode(code: string): void {
  * 从 localStorage 获取存储的邀请码
  */
 export function getStoredReferralCode(): string | null {
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
     return localStorage.getItem(REFERRAL_CODE_STORAGE_KEY);
   }
   return null;
@@ -95,7 +95,7 @@ export function getStoredReferralCode(): string | null {
  * 清除 localStorage 中的邀请码
  */
 export function clearStoredReferralCode(): void {
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
     localStorage.removeItem(REFERRAL_CODE_STORAGE_KEY);
   }
 }
