@@ -3,6 +3,9 @@ import { cleanup } from '@testing-library/react';
 import { afterEach, beforeAll, afterAll } from 'vitest';
 import { server } from './mocks/server';
 
+// Import vi explicitly
+import { vi } from 'vitest';
+
 // Mock Service Worker setup for API testing
 beforeAll(() => {
   // Start MSW server for API mocking
