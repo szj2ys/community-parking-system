@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import ListSearchClient from "./ListSearchClient";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "列表找车位",
   description: "按距离、价格筛选附近可用车位。找到最适合您的社区停车位，按小时租赁，价格实惠。",

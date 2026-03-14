@@ -373,3 +373,113 @@ export function checkNotificationConfig(): { sms: boolean; wechat: boolean; erro
 
   return { sms, wechat, errors };
 }
+
+// 发送推荐奖励到账通知
+export async function sendRewardNotification(
+  referrerId: string,
+  rewardAmount: number,
+  refereeName: string | null,
+  orderAmount: number,
+  triggeredByOrderId: string
+): Promise<NotificationResult[]> {
+  const results: NotificationResult[] = [];
+
+  // 获取邀请人信息
+  const referrer = await prisma.user.findUnique({
+    where: { id: referrerId },
+    select: {
+      phone: true,
+      wxOpenid: true,
+      notificationPrefs: true,
+    },
+  });
+
+  if (!referrer) {
+    console.error(`[Notification] Referrer ${referrerId} not found`);
+    return [{ success: false, channel: 'SMS', error: 'Referrer not found' }];
+  }
+
+  // 解析通知偏好
+  const prefs = validateNotificationPrefs(referrer.notificationPrefs);
+
+  const displayName = refereeName || '好友';
+  const truncatedOrderId = triggeredByOrderId.slice(-6);
+
+  const logData: Omit<NotificationLogData, 'status' | 'errorMessage' | 'channel'> = {
+    userId: referrerId,
+    orderId: triggeredByOrderId,
+    type: 'REFERRAL_REWARD',
+    content: JSON.stringify({ rewardAmount, refereeName: displayName, orderAmount }),
+    retryCount: 0,
+  };
+
+  // 发送短信通知
+  if (prefs.REFERRAL_REWARD.SMS && referrer.phone) {
+    const smsContent = `【社区车位】恭喜！您邀请的${displayName}已完成首单，您获得推荐奖励¥${rewardAmount.toFixed(2)}元。奖励已到账，可前往"我的-推荐奖励"查看。`;
+    const smsResult = await sendSMSWithRetry(referrer.phone, smsContent, {
+      ...logData,
+      channel: 'SMS',
+    });
+    results.push(smsResult);
+  }
+
+  // 发送微信订阅消息
+  if (prefs.REFERRAL_REWARD.WECHAT && referrer.wxOpenid) {
+    const templateData = {
+      thing1: { value: `邀请${displayName}成功` },
+      amount2: { value: `¥${rewardAmount.toFixed(2)}` },
+      thing3: { value: `首单消费¥${orderAmount.toFixed(2)}` },
+      character_string4: { value: truncatedOrderId },
+    };
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      const result = await sendWechatMessage(
+        referrer.wxOpenid,
+        '{{REFERRAL_REWARD_TEMPLATE_ID}}',
+        templateData,
+        '/user/rewards'
+      );
+
+      if (result.success) {
+        logNotification({
+          ...logData,
+          status: 'SUCCESS',
+          retryCount: attempt,
+          channel: 'WECHAT',
+        });
+        results.push({ success: true, channel: 'WECHAT', messageId: result.messageId });
+        break;
+      }
+
+      logNotification({
+        ...logData,
+        status: 'FAILED',
+        errorMessage: result.error,
+        retryCount: attempt,
+        channel: 'WECHAT',
+      });
+
+      if (attempt === MAX_RETRIES) {
+        results.push({ success: false, channel: 'WECHAT', error: result.error });
+      } else {
+        await delay(getRetryDelay(attempt));
+      }
+    }
+  }
+
+  return results;
+}
+
+// 异步发送奖励通知（不阻塞主流程）
+export function sendRewardNotificationAsync(
+  referrerId: string,
+  rewardAmount: number,
+  refereeName: string | null,
+  orderAmount: number,
+  triggeredByOrderId: string
+): void {
+  sendRewardNotification(referrerId, rewardAmount, refereeName, orderAmount, triggeredByOrderId)
+    .catch((error) => {
+      console.error('[Notification] Async reward send failed:', error);
+    });
+}
