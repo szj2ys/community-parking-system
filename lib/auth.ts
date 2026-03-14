@@ -6,6 +6,7 @@ import { prisma } from "./prisma";
 import { z } from "zod";
 import { UserRole, AuthUser } from "@/types";
 import { generateReferralCode, isValidReferralCodeFormat } from "./referral";
+import { generateCode, verifyCode } from "./auth-code";
 
 const credentialsSchema = z.object({
   phone: z.string().regex(/^1[3-9]\d{9}$/, "无效的手机号"),
@@ -13,20 +14,11 @@ const credentialsSchema = z.object({
   referralCode: z.string().optional(),
 });
 
-// 模拟验证码存储 (生产环境使用 Redis)
-const codeStore = new Map<string, string>();
-
-export function generateCode(phone: string): string {
-  const code = Math.random().toString().slice(2, 8);
-  codeStore.set(phone, code);
-  // 5分钟后过期
-  setTimeout(() => codeStore.delete(phone), 5 * 60 * 1000);
-  return code;
-}
-
-export function verifyCode(phone: string, code: string): boolean {
-  return codeStore.get(phone) === code;
-}
+const credentialsSchema = z.object({
+  phone: z.string().regex(/^1[3-9]\d{9}$/, "无效的手机号"),
+  code: z.string().regex(/^\d{6}$/, "验证码必须是6位数字"),
+  referralCode: z.string().optional(),
+});
 
 const nextAuth = NextAuth({
   // Note: PrismaAdapter removed - we're using JWT strategy which doesn't need an adapter
