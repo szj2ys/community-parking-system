@@ -10,8 +10,8 @@ import {
 
 describe("SEO Areas Data", () => {
   describe("seoAreas", () => {
-    it("should have 21 areas defined", () => {
-      expect(seoAreas.length).toBe(21);
+    it("should have 100+ areas defined", () => {
+      expect(seoAreas.length).toBeGreaterThanOrEqual(100);
     });
 
     it("should have unique slugs", () => {
@@ -64,26 +64,26 @@ describe("SEO Areas Data", () => {
 
     it("should include Beijing areas", () => {
       const beijingAreas = seoAreas.filter((area) => area.city === "北京");
-      expect(beijingAreas.length).toBeGreaterThanOrEqual(5);
+      expect(beijingAreas.length).toBeGreaterThanOrEqual(25);
       expect(beijingAreas.some((a) => a.slug === "zhongguancun")).toBe(true);
       expect(beijingAreas.some((a) => a.slug === "guomao")).toBe(true);
     });
 
     it("should include Shanghai areas", () => {
       const shanghaiAreas = seoAreas.filter((area) => area.city === "上海");
-      expect(shanghaiAreas.length).toBeGreaterThanOrEqual(5);
+      expect(shanghaiAreas.length).toBeGreaterThanOrEqual(25);
       expect(shanghaiAreas.some((a) => a.slug === "lujiazui")).toBe(true);
       expect(shanghaiAreas.some((a) => a.slug === "zhangjiang")).toBe(true);
     });
 
     it("should include Shenzhen areas", () => {
       const shenzhenAreas = seoAreas.filter((area) => area.city === "深圳");
-      expect(shenzhenAreas.length).toBeGreaterThanOrEqual(3);
+      expect(shenzhenAreas.length).toBeGreaterThanOrEqual(25);
     });
 
     it("should include Hangzhou areas", () => {
       const hangzhouAreas = seoAreas.filter((area) => area.city === "杭州");
-      expect(hangzhouAreas.length).toBeGreaterThanOrEqual(4);
+      expect(hangzhouAreas.length).toBeGreaterThanOrEqual(25);
     });
   });
 
