@@ -3,12 +3,19 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth } from "date-fns";
 import type { Metadata } from "next";
+import { BASE_URL, generateMetaTags } from "@/lib/seo";
+import { WebSiteStructuredData, OrganizationStructuredData } from "@/components/StructuredData";
+import { getAreasByCity } from "@/data/seo-areas";
 
-export const metadata: Metadata = {
+// Complete SEO metadata for homepage
+export const metadata: Metadata = generateMetaTags({
   title: "社区车位租赁 - 连接车位业主与租户的智能平台",
   description: "发现附近闲置车位，轻松解决停车难题。业主发布车位赚取收益，租户按小时租赁灵活便捷。让闲置车位创造价值。",
-  keywords: ["车位租赁", "社区停车", "共享车位", "小时租", "停车", "车位出租", "附近车位", "闲置车位"],
-};
+  keywords: ["车位租赁", "社区停车", "共享车位", "小时租", "停车", "车位出租", "附近车位", "闲置车位", "小区停车", "车位共享"],
+  canonicalUrl: BASE_URL,
+  ogImage: `${BASE_URL}/api/og?title=${encodeURIComponent("社区车位租赁")}&subtitle=${encodeURIComponent("连接车位业主与租户的智能平台")}`,
+  ogType: "website",
+});
 
 export const dynamic = "force-dynamic";
 
@@ -109,8 +116,21 @@ export default async function HomePage() {
     }
   }
 
+  // Get popular areas for SEO
+  const beijingAreas = getAreasByCity("北京").slice(0, 5);
+  const shanghaiAreas = getAreasByCity("上海").slice(0, 5);
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Structured Data Components */}
+      <WebSiteStructuredData
+        name="社区车位租赁"
+        description="连接车位业主与租户的智能平台"
+        url={BASE_URL}
+        searchUrl={`${BASE_URL}/tenant/list?search={search_term_string}`}
+      />
+      <OrganizationStructuredData />
+
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -271,7 +291,114 @@ export default async function HomePage() {
             <div className="text-gray-500 text-sm">待处理</div>
           </div>
         </div>
+
+        {/* SEO Areas Section */}
+        {!user && (
+          <section className="mt-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">热门区域车位租赁</h2>
+
+            {/* Beijing Areas */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <span className="mr-2">📍</span> 北京
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {beijingAreas.map((area) => (
+                  <Link
+                    key={area.slug}
+                    href={`/areas/${area.slug}`}
+                    className="p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow text-center"
+                  >
+                    <div className="font-medium text-gray-900">{area.name}</div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      ¥{area.priceRange.min}-{area.priceRange.max}/小时
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Shanghai Areas */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <span className="mr-2">📍</span> 上海
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {shanghaiAreas.map((area) => (
+                  <Link
+                    key={area.slug}
+                    href={`/areas/${area.slug}`}
+                    className="p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow text-center"
+                  >
+                    <div className="font-medium text-gray-900">{area.name}</div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      ¥{area.priceRange.min}-{area.priceRange.max}/小时
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
+
+      {/* Footer with SEO Links */}
+      <footer className="bg-white border-t mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">关于我们</h4>
+              <p className="text-sm text-gray-600">
+                社区车位租赁平台连接车位业主与租户，让闲置车位创造价值。
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">热门城市</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link href="/areas/zhongguancun" className="text-gray-600 hover:text-blue-600">
+                    北京车位租赁
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/areas/lujiazui" className="text-gray-600 hover:text-blue-600">
+                    上海车位租赁
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">快速链接</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link href="/tenant/map" className="text-gray-600 hover:text-blue-600">
+                    地图找车位
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/tenant/list" className="text-gray-600 hover:text-blue-600">
+                    列表找车位
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/owner/publish" className="text-gray-600 hover:text-blue-600">
+                    发布车位
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">联系方式</h4>
+              <p className="text-sm text-gray-600">
+                如有问题或建议，请联系我们
+              </p>
+            </div>
+          </div>
+          <div className="mt-8 pt-8 border-t text-center text-sm text-gray-500">
+            <p>© {new Date().getFullYear()} 社区车位租赁. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
