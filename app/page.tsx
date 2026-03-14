@@ -1,15 +1,113 @@
 import { auth } from "@/lib/auth";
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { startOfMonth, endOfMonth } from "date-fns";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "社区车位租赁 - 连接车位业主与租户的智能平台",
+  description: "发现附近闲置车位，轻松解决停车难题。业主发布车位赚取收益，租户按小时租赁灵活便捷。让闲置车位创造价值。",
+  keywords: ["车位租赁", "社区停车", "共享车位", "小时租", "停车", "车位出租", "附近车位", "闲置车位"],
+};
 
 export const dynamic = "force-dynamic";
+
+async function getOwnerStats(userId: string) {
+  const startOfThisMonth = startOfMonth(new Date());
+  const endOfThisMonth = endOfMonth(new Date());
+
+  const [totalSpots, monthlyEarnings, pendingOrders] = await Promise.all([
+    // Total published spots
+    prisma.parkingSpot.count({
+      where: { ownerId: userId },
+    }),
+    // Monthly earnings from completed orders
+    prisma.order.aggregate({
+      where: {
+        spot: { ownerId: userId },
+        status: "COMPLETED",
+        createdAt: {
+          gte: startOfThisMonth,
+          lte: endOfThisMonth,
+        },
+      },
+      _sum: { totalPrice: true },
+    }),
+    // Pending orders
+    prisma.order.count({
+      where: {
+        spot: { ownerId: userId },
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
+    }),
+  ]);
+
+  return {
+    totalSpots,
+    monthlyEarnings: monthlyEarnings._sum.totalPrice?.toNumber() ?? 0,
+    pendingOrders,
+  };
+}
+
+async function getTenantStats(userId: string) {
+  const startOfThisMonth = startOfMonth(new Date());
+  const endOfThisMonth = endOfMonth(new Date());
+
+  const [completedOrders, monthlySpending, pendingOrders] = await Promise.all([
+    // Total completed bookings
+    prisma.order.count({
+      where: {
+        tenantId: userId,
+        status: "COMPLETED",
+      },
+    }),
+    // Monthly spending on parking
+    prisma.order.aggregate({
+      where: {
+        tenantId: userId,
+        status: "COMPLETED",
+        createdAt: {
+          gte: startOfThisMonth,
+          lte: endOfThisMonth,
+        },
+      },
+      _sum: { totalPrice: true },
+    }),
+    // Pending orders
+    prisma.order.count({
+      where: {
+        tenantId: userId,
+        status: { in: ["PENDING", "CONFIRMED", "IN_PROGRESS"] },
+      },
+    }),
+  ]);
+
+  return {
+    completedOrders,
+    monthlySpending: monthlySpending._sum.totalPrice?.toNumber() ?? 0,
+    pendingOrders,
+  };
+}
 
 export default async function HomePage() {
   const session = await auth();
   const user = session?.user;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userId = (user as any)?.id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userRole = (user as any)?.role;
   const isOwner = userRole === "OWNER";
   const isTenant = userRole === "TENANT";
+
+  // Fetch real stats
+  let stats = null;
+  if (userId) {
+    if (isOwner) {
+      stats = await getOwnerStats(userId);
+    } else if (isTenant) {
+      stats = await getTenantStats(userId);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -147,19 +245,29 @@ export default async function HomePage() {
         {/* Stats */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-6 bg-white rounded-xl shadow">
-            <div className="text-2xl font-bold text-blue-600">0</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {isOwner
+                ? (stats as Extract<typeof stats, { totalSpots: number }> | null)?.totalSpots ?? 0
+                : (stats as Extract<typeof stats, { completedOrders: number }> | null)?.completedOrders ?? 0}
+            </div>
             <div className="text-gray-500 text-sm">
               {isOwner ? "已发布车位" : "已完成预订"}
             </div>
           </div>
           <div className="p-6 bg-white rounded-xl shadow">
-            <div className="text-2xl font-bold text-green-600">0</div>
+            <div className="text-2xl font-bold text-green-600">
+              ¥{isOwner
+                ? ((stats as Extract<typeof stats, { monthlyEarnings: number }> | null)?.monthlyEarnings ?? 0).toFixed(2)
+                : ((stats as Extract<typeof stats, { monthlySpending: number }> | null)?.monthlySpending ?? 0).toFixed(2)}
+            </div>
             <div className="text-gray-500 text-sm">
-              {isOwner ? "本月收益" : "节省费用"}
+              {isOwner ? "本月收益" : "本月停车费用"}
             </div>
           </div>
           <div className="p-6 bg-white rounded-xl shadow">
-            <div className="text-2xl font-bold text-purple-600">0</div>
+            <div className="text-2xl font-bold text-purple-600">
+              {stats?.pendingOrders ?? 0}
+            </div>
             <div className="text-gray-500 text-sm">待处理</div>
           </div>
         </div>
