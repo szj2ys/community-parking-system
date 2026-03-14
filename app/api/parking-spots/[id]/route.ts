@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { maskPhoneNumber } from "@/lib/privacy";
 
 // 获取车位详情
 export async function GET(
@@ -33,7 +34,16 @@ export async function GET(
       });
     }
 
-    return NextResponse.json(successResponse(spot));
+    // Mask phone number in response
+    const maskedSpot = {
+      ...spot,
+      owner: {
+        ...spot.owner,
+        phone: maskPhoneNumber(spot.owner.phone),
+      },
+    };
+
+    return NextResponse.json(successResponse(maskedSpot));
   } catch (error) {
     console.error("获取车位详情失败:", error);
     return NextResponse.json(

@@ -3,6 +3,7 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { calculateReferralReward } from "@/lib/referral";
+import { maskPhoneNumber } from "@/lib/privacy";
 
 // 确认订单
 export async function PATCH(
@@ -151,8 +152,19 @@ export async function PATCH(
       }
     }
 
+    // Mask phone number in response
+    const maskedOrder = {
+      ...updatedOrder,
+      tenant: updatedOrder.tenant
+        ? {
+            ...updatedOrder.tenant,
+            phone: maskPhoneNumber(updatedOrder.tenant.phone),
+          }
+        : null,
+    };
+
     return NextResponse.json(
-      successResponse(updatedOrder, "操作成功")
+      successResponse(maskedOrder, "操作成功")
     );
   } catch (error) {
     console.error("更新订单失败:", error);
@@ -212,7 +224,25 @@ export async function GET(
       });
     }
 
-    return NextResponse.json(successResponse(order));
+    // Mask phone numbers in response
+    const maskedOrder = {
+      ...order,
+      spot: {
+        ...order.spot,
+        owner: {
+          ...order.spot.owner,
+          phone: maskPhoneNumber(order.spot.owner.phone),
+        },
+      },
+      tenant: order.tenant
+        ? {
+            ...order.tenant,
+            phone: maskPhoneNumber(order.tenant.phone),
+          }
+        : null,
+    };
+
+    return NextResponse.json(successResponse(maskedOrder));
   } catch (error) {
     console.error("获取订单详情失败:", error);
     return NextResponse.json(
