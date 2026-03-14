@@ -4,11 +4,11 @@ import { auth } from "@/lib/auth";
 import {
   getUserNotificationPrefs,
   updateUserNotificationPrefs,
-  NotificationPrefs,
 } from "@/lib/notifications";
 import {
   defaultNotificationPrefs,
   validateNotificationPrefs,
+  NotificationPrefs,
 } from "@/lib/notification-templates";
 
 /**

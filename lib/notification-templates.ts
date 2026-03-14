@@ -1,5 +1,13 @@
 // 通知模板类型
-export type NotificationType = 'NEW_ORDER' | 'PAYMENT_SUCCESS' | 'ORDER_CANCELLED';
+export type NotificationType = 'NEW_ORDER' | 'PAYMENT_SUCCESS' | 'ORDER_CANCELLED' | 'REFERRAL_REWARD';
+
+// 奖励通知模板变量
+export interface RewardTemplateVariables {
+  rewardAmount: string;
+  refereeName: string;
+  orderAmount: string;
+  triggeredByOrderId: string;
+}
 
 // 通知渠道类型
 export type NotificationChannel = 'SMS' | 'WECHAT';
@@ -32,6 +40,9 @@ export const smsTemplates: Record<NotificationType, (vars: TemplateVariables) =>
 
   ORDER_CANCELLED: (vars) =>
     `【社区车位】订单已取消。车位：${vars.spotAddress}，时间：${vars.startTime}至${vars.endTime}，订单号：${vars.orderId}。`,
+
+  REFERRAL_REWARD: () =>
+    '', // 奖励通知不使用通用模板变量，使用单独的发送函数
 };
 
 // 微信订阅消息模板（使用微信官方的模板ID）
@@ -67,6 +78,15 @@ export const wechatTemplates: Record<NotificationType, { templateId: string; dat
       character_string6: { value: vars.orderId },
     }),
   },
+
+  REFERRAL_REWARD: {
+    templateId: '{{REFERRAL_REWARD_TEMPLATE_ID}}',
+    data: () => ({
+      // 奖励通知使用单独的模板数据处理
+      thing1: { value: '' },
+      amount2: { value: '' },
+    }),
+  },
 };
 
 // 通知类型中文名称
@@ -74,6 +94,7 @@ export const notificationTypeNames: Record<NotificationType, string> = {
   NEW_ORDER: '新订单通知',
   PAYMENT_SUCCESS: '订单支付成功',
   ORDER_CANCELLED: '订单取消',
+  REFERRAL_REWARD: '推荐奖励到账',
 };
 
 // 默认通知偏好配置
@@ -81,6 +102,7 @@ export const defaultNotificationPrefs: NotificationPrefs = {
   NEW_ORDER: { SMS: true, WECHAT: true },
   PAYMENT_SUCCESS: { SMS: false, WECHAT: true },
   ORDER_CANCELLED: { SMS: false, WECHAT: true },
+  REFERRAL_REWARD: { SMS: false, WECHAT: true },
 };
 
 // 通知偏好类型定义
@@ -118,7 +140,7 @@ export function validateNotificationPrefs(prefs: unknown): NotificationPrefs {
     return defaultNotificationPrefs;
   }
 
-  const types: NotificationType[] = ['NEW_ORDER', 'PAYMENT_SUCCESS', 'ORDER_CANCELLED'];
+  const types: NotificationType[] = ['NEW_ORDER', 'PAYMENT_SUCCESS', 'ORDER_CANCELLED', 'REFERRAL_REWARD'];
   const channels: NotificationChannel[] = ['SMS', 'WECHAT'];
   const result = { ...defaultNotificationPrefs };
 
