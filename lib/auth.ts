@@ -27,7 +27,7 @@ export function verifyCode(phone: string, code: string): boolean {
 }
 
 const nextAuth = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  // Note: PrismaAdapter removed - we're using JWT strategy which doesn't need an adapter
   session: { strategy: "jwt" },
   pages: {
     signIn: "/auth/login",
