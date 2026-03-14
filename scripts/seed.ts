@@ -1,21 +1,37 @@
+#!/usr/bin/env tsx
+/**
+ * Comprehensive Seed Data Generator
+ *
+ * Generates realistic mock data for development and testing:
+ * - 25 users (mix of owners, tenants, and admins)
+ * - 60 parking spots across Beijing districts
+ * - 40 orders with various statuses
+ * - 15 referral records
+ *
+ * Usage:
+ *   npx tsx scripts/seed.ts          # Seed all data
+ *   npx tsx scripts/seed.ts --clean  # Reset then seed
+ */
+
 import { PrismaClient, UserRole, SpotStatus, OrderStatus } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// Beijing area coordinates
-const beijingAreas: Record<string, { center: [number, number]; radius: number }> = {
-  "朝阳区": { center: [116.4074, 39.9042], radius: 0.08 },
-  "海淀区": { center: [116.2974, 39.9592], radius: 0.1 },
-  "东城区": { center: [116.4174, 39.9292], radius: 0.04 },
-  "西城区": { center: [116.3674, 39.9142], radius: 0.04 },
-  "丰台区": { center: [116.2874, 39.8642], radius: 0.08 },
-  "石景山区": { center: [116.2274, 39.9062], radius: 0.05 },
-  "通州区": { center: [116.6574, 39.9092], radius: 0.08 },
-  "昌平区": { center: [116.2374, 40.2212], radius: 0.1 },
-  "大兴区": { center: [116.3474, 39.7282], radius: 0.09 },
-  "顺义区": { center: [116.6574, 40.1302], radius: 0.08 },
+// Beijing area coordinates (approximate centers for each district)
+const beijingAreas = {
+  朝阳区: { center: [116.4074, 39.9042], radius: 0.08 },
+  海淀区: { center: [116.2974, 39.9592], radius: 0.1 },
+  东城区: { center: [116.4174, 39.9292], radius: 0.04 },
+  西城区: { center: [116.3674, 39.9142], radius: 0.04 },
+  丰台区: { center: [116.2874, 39.8642], radius: 0.08 },
+  石景山区: { center: [116.2274, 39.9062], radius: 0.05 },
+  通州区: { center: [116.6574, 39.9092], radius: 0.08 },
+  昌平区: { center: [116.2374, 40.2212], radius: 0.1 },
+  大兴区: { center: [116.3474, 39.7282], radius: 0.09 },
+  顺义区: { center: [116.6574, 40.1302], radius: 0.08 },
 };
 
+// Residential and commercial complex names
 const complexNames = [
   "阳光花园", "万科金色家园", "龙湖天街", "富力城", "华贸中心",
   "万达广场", "中海紫御", "保利罗兰", "金茂府", "融创壹号",
@@ -24,6 +40,7 @@ const complexNames = [
   "北辰世纪", "金地国际", "招商局大厦", "金融街中心", "国贸三期",
 ];
 
+// Street names
 const streetNames = [
   "建国路", "长安街", "中关村大街", "三里屯路", "望京街",
   "东直门外大街", "西单北大街", "王府井大街", "金融街", "CBD核心区",
@@ -31,6 +48,7 @@ const streetNames = [
   "亦庄经济开发区", "丰台科技园", "石景山万达广场", "通州新城", "顺义空港",
 ];
 
+// Spot title templates
 const spotTitleTemplates = [
   "{complex}地下车位 {zone}-{number}",
   "{complex}地面车位 {zone}-{number}",
@@ -39,6 +57,7 @@ const spotTitleTemplates = [
   "{complex}VIP车位 {zone}-{number}",
 ];
 
+// Description templates
 const descriptionTemplates = [
   "靠近电梯口，方便进出，限高2.1米，适合轿车",
   "地面车位，有遮阳棚，方便进出",
@@ -54,6 +73,7 @@ const descriptionTemplates = [
   "地面固定车位，有地锁，长期出租优先",
 ];
 
+// User names
 const firstNames = [
   "伟", "芳", "娜", "秀英", "敏", "静", "丽", "强", "磊", "军",
   "洋", "勇", "艳", "杰", "娟", "涛", "明", "超", "秀兰", "霞",
@@ -65,6 +85,7 @@ const lastNames = [
   "徐", "孙", "胡", "朱", "高", "林", "何", "郭", "马", "罗",
 ];
 
+// Helper functions
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -100,11 +121,13 @@ function generateReferralCode(): string {
 }
 
 function generateCoordinates(district: string): [number, number] {
-  const area = beijingAreas[district] || beijingAreas["朝阳区"];
+  const area = beijingAreas[district as keyof typeof beijingAreas] || beijingAreas["朝阳区"];
   const [centerLng, centerLat] = area.center;
   const radius = area.radius;
+
   const lng = centerLng + (Math.random() - 0.5) * 2 * radius;
   const lat = centerLat + (Math.random() - 0.5) * 2 * radius;
+
   return [parseFloat(lng.toFixed(6)), parseFloat(lat.toFixed(6))];
 }
 
@@ -113,7 +136,7 @@ function generateSpotTitle(): string {
   const district = randomItem(Object.keys(beijingAreas));
   const complex = randomItem(complexNames);
   const street = randomItem(streetNames);
-  const zone = String.fromCharCode(65 + randomInt(0, 25));
+  const zone = String.fromCharCode(65 + randomInt(0, 25)); // A-Z
   const number = randomInt(1, 999).toString().padStart(2, "0");
 
   return template
@@ -129,14 +152,17 @@ function generateAddress(): string {
   const street = randomItem(streetNames);
   const complex = randomItem(complexNames);
   const number = randomInt(1, 100);
+
   return `北京市${district}${street}${number}号${complex}`;
 }
 
 function generatePrice(): number {
+  // Prices range from 2 to 15 yuan per hour
   const prices = [2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 10, 12, 15];
   return randomItem(prices);
 }
 
+// Data generators
 async function generateUsers(count: number) {
   const users = [];
   const usedPhones = new Set<string>();
@@ -155,6 +181,7 @@ async function generateUsers(count: number) {
     }
     usedReferralCodes.add(referralCode);
 
+    // Role distribution: 40% owners, 50% tenants, 10% admins
     const roleRoll = Math.random();
     let role: UserRole;
     if (roleRoll < 0.4) {
@@ -185,11 +212,13 @@ async function generateParkingSpots(owners: { id: string }[], count: number) {
     const [longitude, latitude] = generateCoordinates(district);
     const price = generatePrice();
 
+    // Generate available hours
     const availableFrom = new Date();
     availableFrom.setHours(randomInt(0, 8), 0, 0, 0);
     const availableTo = new Date();
     availableTo.setHours(randomInt(18, 23), 59, 0, 0);
 
+    // Status distribution: 70% available, 20% rented, 10% unavailable
     const statusRoll = Math.random();
     let status: SpotStatus;
     if (statusRoll < 0.7) {
@@ -231,29 +260,35 @@ async function generateOrders(
     const spot = randomItem(spots);
     const combinationKey = `${tenant.id}-${spot.id}`;
 
+    // Avoid too many duplicate tenant-spot combinations
     if (usedCombinations.has(combinationKey) && Math.random() > 0.3) {
       continue;
     }
     usedCombinations.add(combinationKey);
 
+    // Generate random time range
     const now = new Date();
     const daysOffset = randomInt(-30, 30);
     const startTime = new Date(now);
     startTime.setDate(startTime.getDate() + daysOffset);
     startTime.setHours(randomInt(8, 18), randomInt(0, 59), 0, 0);
 
-    const duration = randomInt(1, 8);
+    const duration = randomInt(1, 8); // 1-8 hours
     const endTime = new Date(startTime);
     endTime.setHours(endTime.getHours() + duration);
 
     const totalPrice = parseFloat((spot.pricePerHour * duration).toFixed(2));
 
+    // Status based on time
     let status: OrderStatus;
     if (daysOffset < -1) {
+      // Past orders
       status = Math.random() > 0.2 ? "COMPLETED" : "CANCELLED";
     } else if (daysOffset > 1) {
+      // Future orders
       status = Math.random() > 0.3 ? "CONFIRMED" : "PENDING";
     } else {
+      // Current orders
       status = Math.random() > 0.5 ? "IN_PROGRESS" : "CONFIRMED";
     }
 
@@ -277,6 +312,7 @@ async function generateReferrals(
 ) {
   const referrals = [];
   const usedReferees = new Set<string>();
+
   const referrers = users.filter((u) => u.referralCode);
 
   for (let i = 0; i < count; i++) {
@@ -303,8 +339,21 @@ async function generateReferrals(
   return referrals;
 }
 
+// Main seed function
 async function main() {
+  const args = process.argv.slice(2);
+  const shouldClean = args.includes("--clean");
+
   console.log("🌱 开始生成种子数据...\n");
+
+  if (shouldClean) {
+    console.log("🧹 清理现有数据...");
+    await prisma.order.deleteMany();
+    await prisma.referralRecord.deleteMany();
+    await prisma.parkingSpot.deleteMany();
+    await prisma.user.deleteMany();
+    console.log("✅ 数据清理完成\n");
+  }
 
   // 1. Create users
   console.log("👥 创建用户...");
@@ -366,7 +415,7 @@ async function main() {
 
   for (const referral of referralData) {
     const created = await prisma.referralRecord.create({
-      data: referral as unknown as { referrerId: string; refereeId: string; status: string; rewardAmount: number; rewardedAt: Date | null; },
+      data: referral as any,
     });
     createdReferrals.push(created);
   }
