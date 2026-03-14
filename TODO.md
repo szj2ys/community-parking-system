@@ -1,102 +1,75 @@
 > !! 请勿提交此文件 !!
 
-# T0-map · Phase 0
+# T0-image · Phase 0
 
-> 用户能在真实地图上查看车位位置，业主发布时可在地图选址
+> 用户能够上传车位照片，让租户更直观地了解车位情况
 
 ## 上下文
 
-- **依赖**: 无
-- **边界**: 不修改认证系统、订单系统
-- **高德地图**: 使用 JS API 2.0，需要申请 Key
+- **依赖**: T0-map 已合入 main（地图选址功能已完成）
+- **边界**: 本 Track 不修改地图相关代码，专注图片上传功能
 
 ## Tasks
 
-### 1. 集成高德地图 JS API
+### 1. 安装 Vercel Blob SDK
 
-- [ ] 申请高德地图 Key（Web端 JS API）
-- [ ] 创建 `components/map/` 目录
-- [ ] 实现 `MapContainer` 组件（基础地图容器）
-- [ ] 实现 `MapMarker` 组件（车位标记）
-- [ ] 在 `app/layout.tsx` 添加高德地图脚本
-- **文件**: `components/map/MapContainer.tsx`（新建）
-- **验收**: Given 地图组件挂载, When 页面加载, Then 显示真实地图
-- **测试**: 组件测试 · `should render map when API loaded`
+- [x] 安装 `@vercel/blob` 依赖
+- **文件**: `package.json`
+- **验收**: `npm install` 成功，SDK 可用
 
-### 2. 实现车位标记展示
+### 2. 创建图片上传 API
 
-- [ ] 在地图上显示多个车位标记
-- [ ] 标记显示价格（¥X/小时）
-- [ ] 点击标记显示车位详情卡片
-- [ ] 标记聚合（当车位密集时）
-- **文件**: `components/map/ParkingSpotMarkers.tsx`（新建）
-- **验收**: Given 多个车位坐标, When 地图渲染, Then 正确显示所有标记
-- **测试**: 组件测试 · `should show price on marker`
+- [x] 创建 `/api/upload` API route，使用 Vercel Blob 处理图片上传
+- **文件**: `app/api/upload/route.ts`（新建）
+- **验收**: POST 请求能接收图片文件，返回图片 URL
+- **测试**: 上传图片后返回可访问的 URL
 
-### 3. 替换租户地图页面
+### 3. 创建图片上传组件
 
-- [ ] 修改 `app/tenant/map/page.tsx`
-- [ ] 移除 emoji 模拟地图
-- [ ] 集成真实地图组件
-- [ ] 侧边栏列表与地图联动（点击列表项地图定位）
-- **文件**: `app/tenant/map/page.tsx`（修改）
-- **验收**: Given 用户访问地图页, When 授权定位, Then 显示真实地图和附近车位
-- **测试**: E2E测试 · `should display real map with spots`
+- [x] 创建可复用的 ImageUploader 组件，支持多图上传、预览、删除
+- **文件**: `components/ImageUploader.tsx`（新建）
+- **验收**:
+  - 支持点击或拖拽上传
+  - 支持多图（最多5张）
+  - 显示上传进度和预览
+  - 可删除已选图片
+- **测试**: 组件渲染正常，交互流畅
 
-### 4. 业主发布页地图选址
+### 4. 集成到车位发布页
 
-- [ ] 修改 `app/owner/publish/page.tsx`
-- [ ] 添加地图选址组件（可拖拽标记选位置）
-- [ ] 选择位置后自动回填经纬度字段
-- [ ] 地址解析（反向地理编码）
-- **文件**: `app/owner/publish/page.tsx`（修改）
-- **验收**: Given 业主发布车位, When 在地图选择位置, Then 自动填充经纬度和地址
-- **测试**: 组件测试 · `should update coordinates on marker drag`
+- [x] 在 owner/publish 页面添加图片上传区域
+- **文件**: `app/owner/publish/page.tsx`
+- **验收**:
+  - 页面显示图片上传组件
+  - 发布时图片 URL 随表单一起提交
+  - 支持编辑时修改图片（通过 PATCH API）
+
+### 5. 更新数据库 Schema
+
+- [x] ParkingSpot 模型已有 images 字段存储图片 URL 数组
+- **文件**: `prisma/schema.prisma`
+- **验收**: 无需迁移，字段已存在
+
+### 6. 更新车位详情页展示图片
+
+- [x] 在车位详情页显示图片轮播/画廊
+- **文件**: `app/parking-spots/[id]/page.tsx`
+- **验收**: 有图片时显示图片画廊，无图片时显示占位图
+
+实现好后需要使用 code-simplifier agent 进行代码优化。
 
 ## Done When
 
 - [ ] 所有 Tasks checkbox 已勾选
 - [ ] `npm run build` 无报错
-- [ ] 地图页显示真实高德地图
-- [ ] 发布页可在地图选址
-- [ ] 无 lint / type 错误
+- [ ] `npx tsc --noEmit` 无类型错误
+- [ ] 手动测试：上传图片 → 发布车位 → 查看详情页显示图片
 
----
+## 测试规约
 
-### 技术方案
-
-```bash
-# 高德地图 Key 配置（添加到 .env）
-NEXT_PUBLIC_AMAP_KEY=your_amap_key
-```
-
-**组件设计**:
-```tsx
-// components/map/MapContainer.tsx
-interface MapContainerProps {
-  center: { lat: number; lng: number };
-  zoom?: number;
-  onMapClick?: (lat: number, lng: number) => void;
-  children?: React.ReactNode;
-}
-
-// components/map/ParkingSpotMarker.tsx
-interface MarkerProps {
-  position: { lat: number; lng: number };
-  price: number;
-  onClick?: () => void;
-}
-```
-
-**依赖库**:
-- `@amap/amap-jsapi-loader` - 高德地图加载器
-
----
-
-### 测试规约
-
-| 变更类型 | 要求 |
-|---------|------|
-| 地图组件 | 组件测试：渲染 + 交互 + 加载状态 |
-| 页面集成 | E2E测试：完整用户流程 |
-| API 调用 | 单元测试：高德 API 封装 |
+| 变更类型          | 要求                           |
+| ----------------- | ------------------------------ |
+| 工具函数 / 纯逻辑 | 单元测试：核心路径 + 边界 case |
+| UI 组件           | 组件测试：渲染 + 交互 + 状态   |
+| 跨模块 / API 交互 | 集成测试：模拟完整用户流程     |
+| 合入 main 前      | 冒烟测试：构建 + 全量测试通过  |

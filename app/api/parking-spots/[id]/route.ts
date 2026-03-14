@@ -75,7 +75,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { status, pricePerHour, description } = body;
+    const { status, pricePerHour, description, images } = body;
 
     const updatedSpot = await prisma.parkingSpot.update({
       where: { id },
@@ -83,6 +83,7 @@ export async function PATCH(
         ...(status && { status }),
         ...(pricePerHour !== undefined && { pricePerHour }),
         ...(description !== undefined && { description }),
+        ...(images !== undefined && { images }),
       },
     });
 

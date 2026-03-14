@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ParkingSpot, SpotStatus } from "@/types";
+import { ParkingSpot } from "@/types";
+import StatusBadge from "@/components/StatusBadge";
 
 export default function ParkingSpotDetailPage({ params }: { params: { id: string } }) {
   const [spot, setSpot] = useState<ParkingSpot | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     fetchSpot();
@@ -28,24 +30,6 @@ export default function ParkingSpotDetailPage({ params }: { params: { id: string
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStatusBadge = (status: SpotStatus) => {
-    const styles = {
-      AVAILABLE: "bg-green-100 text-green-700",
-      RENTED: "bg-blue-100 text-blue-700",
-      UNAVAILABLE: "bg-gray-100 text-gray-700",
-    };
-    const labels = {
-      AVAILABLE: "可租",
-      RENTED: "已租",
-      UNAVAILABLE: "暂不出租",
-    };
-    return (
-      <span className={`px-3 py-1 rounded-full text-sm ${styles[status]}`}>
-        {labels[status]}
-      </span>
-    );
   };
 
   if (loading) {
@@ -107,9 +91,77 @@ export default function ParkingSpotDetailPage({ params }: { params: { id: string
               </div>
             </div>
             <div className="mt-4">
-              {getStatusBadge(spot.status)}
+              <StatusBadge status={spot.status} size="md" />
             </div>
           </div>
+
+          {/* Image Gallery */}
+          {spot.images && spot.images.length > 0 ? (
+            <div className="border-b">
+              {/* Main Image */}
+              <div className="relative aspect-video bg-gray-100">
+                <img
+                  src={spot.images[currentImageIndex]}
+                  alt={`车位图片 ${currentImageIndex + 1}`}
+                  className="w-full h-full object-contain"
+                />
+                {spot.images.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : spot.images.length - 1))}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70"
+                      aria-label="上一张"
+                    >
+                      ←
+                    </button>
+                    <button
+                      onClick={() => setCurrentImageIndex((prev) => (prev < spot.images.length - 1 ? prev + 1 : 0))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70"
+                      aria-label="下一张"
+                    >
+                      →
+                    </button>
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/50 text-white text-sm rounded">
+                      {currentImageIndex + 1} / {spot.images.length}
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Thumbnails */}
+              {spot.images.length > 1 && (
+                <div className="flex gap-2 p-4 bg-gray-50 overflow-x-auto">
+                  {spot.images.map((url, index) => (
+                    <button
+                      key={url}
+                      onClick={() => setCurrentImageIndex(index)}
+                      className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 flex-shrink-0 ${
+                        index === currentImageIndex
+                          ? "border-blue-500"
+                          : "border-transparent hover:border-gray-300"
+                      }`}
+                    >
+                      <img
+                        src={url}
+                        alt={`缩略图 ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="border-b">
+              <div className="aspect-video bg-gray-100 flex items-center justify-center">
+                <div className="text-center text-gray-400">
+                  <svg className="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p>暂无图片</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Info */}
           <div className="p-6 space-y-4">

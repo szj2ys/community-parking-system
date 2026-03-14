@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import { z } from "zod";
+import { UserRole, AuthUser } from "@/types";
 
 const credentialsSchema = z.object({
   phone: z.string().regex(/^1[3-9]\d{9}$/, "无效的手机号"),
@@ -39,7 +40,7 @@ const nextAuth = NextAuth({
         phone: { label: "手机号", type: "text" },
         code: { label: "验证码", type: "text" },
       },
-      async authorize(credentials) {
+      async authorize(credentials): Promise<AuthUser | null> {
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) {
           return null;
@@ -62,7 +63,7 @@ const nextAuth = NextAuth({
           user = await prisma.user.create({
             data: {
               phone,
-              role: "TENANT",
+              role: UserRole.TENANT,
             },
           });
         }
@@ -70,8 +71,8 @@ const nextAuth = NextAuth({
         return {
           id: user.id,
           phone: user.phone,
-          role: user.role,
-          name: user.name,
+          role: user.role as UserRole,
+          name: user.name ?? undefined,
         };
       },
     }),
@@ -79,21 +80,17 @@ const nextAuth = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        token.role = (user as any).role;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        token.phone = (user as any).phone;
+        const authUser = user as AuthUser;
+        token.role = authUser.role;
+        token.phone = authUser.phone;
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (session.user as any).id = token.sub!;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (session.user as any).role = token.role as string;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (session.user as any).phone = token.phone as string;
+        session.user.id = token.sub!;
+        session.user.role = token.role as UserRole;
+        session.user.phone = token.phone as string;
       }
       return session;
     },
