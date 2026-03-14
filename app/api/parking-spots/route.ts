@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
 import { SpotStatus } from "@prisma/client";
+import { UserRole } from "@/types";
 
 const createSpotSchema = z.object({
   title: z.string().min(1, "请输入车位标题"),
@@ -12,6 +13,7 @@ const createSpotSchema = z.object({
   latitude: z.number().min(-90).max(90),
   pricePerHour: z.number().min(0, "价格不能为负数"),
   description: z.string().optional(),
+  images: z.array(z.string()).optional(),
   availableFrom: z.string().optional(),
   availableTo: z.string().optional(),
 });
@@ -27,7 +29,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if ((session.user as { role?: string }).role !== "OWNER") {
+    if (session.user.role !== UserRole.OWNER) {
       return NextResponse.json(
         errorResponse("FORBIDDEN", "只有业主可以发布车位"),
         { status: 403 }
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest) {
       latitude,
       pricePerHour,
       description,
+      images,
       availableFrom,
       availableTo,
     } = parsed.data;
@@ -67,16 +70,17 @@ export async function POST(request: NextRequest) {
 
     const spot = await prisma.parkingSpot.create({
       data: {
-        ownerId: session.user.id!,
+        ownerId: session.user.id,
         title,
         address,
         longitude,
         latitude,
         pricePerHour,
         description,
+        images: images || [],
         availableFrom: availableFromDate,
         availableTo: availableToDate,
-        status: "AVAILABLE",
+        status: SpotStatus.AVAILABLE,
       },
     });
 
@@ -104,7 +108,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
 
     const where: { ownerId: string; status?: SpotStatus } = {
-      ownerId: session.user.id!,
+      ownerId: session.user.id,
     };
 
     if (status) {

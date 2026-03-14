@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import MapContainer from "@/components/map/MapContainer";
+import ImageUploader from "@/components/ImageUploader";
 
 export default function PublishSpotPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function PublishSpotPage() {
     availableFrom: "08:00",
     availableTo: "22:00",
   });
+  const [images, setImages] = useState<string[]>([]);
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
     setFormData((prev) => ({
@@ -111,6 +113,7 @@ export default function PublishSpotPage() {
           longitude: parseFloat(formData.longitude),
           latitude: parseFloat(formData.latitude),
           pricePerHour: parseFloat(formData.pricePerHour),
+          images,
         }),
       });
 
@@ -279,6 +282,13 @@ export default function PublishSpotPage() {
               rows={4}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              车位照片
+            </label>
+            <ImageUploader images={images} onChange={setImages} maxImages={5} />
           </div>
 
           <div className="flex gap-4 pt-4">

@@ -17,6 +17,14 @@ export interface User {
   updatedAt: Date;
 }
 
+// NextAuth 扩展类型
+export interface AuthUser {
+  id: string;
+  phone: string;
+  role: UserRole;
+  name?: string;
+}
+
 // 车位状态
 export enum SpotStatus {
   AVAILABLE = 'AVAILABLE',
